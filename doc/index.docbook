@@ -1,0 +1,95 @@
+<?xml version="1.0" ?>
+<!--
+  SPDX-FileCopyrightText: 2026 Laurent Montel <montel@kde.org>
+  SPDX-License-Identifier: CC-BY-SA-4.0
+-->
+<!DOCTYPE book PUBLIC "-//KDE//DTD DocBook XML V4.5-Based Variant V1.1//EN"
+"dtd/kdedbx45.dtd" [
+  <!ENTITY i18n-kapplication "<application>Plasma Assist</application>">
+  <!ENTITY kappname "&i18n-kapplication;">
+  <!ENTITY % addindex "IGNORE">
+  <!ENTITY % English "INCLUDE">
+]>
+
+<book id="plasma-assist" lang="&language;">
+
+<bookinfo>
+<title>The &kappname; Handbook</title>
+
+<authorgroup>
+<author>
+<personname>
+<firstname>Laurent</firstname>
+<surname>Montel</surname>
+</personname>
+<email>montel@kde.org</email>
+</author>
+<!-- TRANS:ROLES_OF_TRANSLATORS -->
+</authorgroup>
+
+<copyright>
+<year>2026</year>
+<holder>Laurent Montel</holder>
+</copyright>
+
+<legalnotice>&FDLNotice;</legalnotice>
+
+<date>2026-10-22</date>
+<releaseinfo>0.1.0</releaseinfo>
+
+<abstract>
+<para>
+&kappname; is an assistant which helps you to diagnose and fix common
+problems on the &plasma; desktop: no sound, external display, network,
+sleep or crashing applications.
+</para>
+</abstract>
+
+<keywordset>
+<keyword>KDE</keyword>
+<keyword>Plasma</keyword>
+<keyword>MCP</keyword>
+<keyword>troubleshooting</keyword>
+<keyword>assistant</keyword>
+</keywordset>
+
+</bookinfo>
+
+<chapter id="introduction">
+<title>Introduction</title>
+
+<para>
+&kappname; is made of three components:
+</para>
+
+<itemizedlist>
+<listitem><para><command>plasma-assist-troubleshooter</command>, a Model Context Protocol
+(<acronym>MCP</acronym>) server which provides tools to diagnose and fix the desktop;</para></listitem>
+<listitem><para><command>plasma-assistd</command>, a daemon which hosts the conversations with the language model;</para></listitem>
+<listitem><para>a &plasma; applet which is the user interface.</para></listitem>
+</itemizedlist>
+
+<para>
+Diagnostic tools are read only. Every action which changes the system needs an explicit
+confirmation and can be undone.
+</para>
+</chapter>
+
+<chapter id="credits">
+<title>Credits and License</title>
+
+<para>
+&kappname;
+</para>
+<para>
+Program copyright 2026 Laurent Montel <email>montel@kde.org</email>
+</para>
+
+<!-- TRANS:CREDIT_FOR_TRANSLATORS -->
+
+&underFDL;
+&underGPL;
+
+</chapter>
+
+</book>

@@ -1,0 +1,28 @@
+version = 1
+SPDX-PackageName = "plasma-assist"
+SPDX-PackageSupplier = "Laurent Montel <montel@kde.org>"
+SPDX-PackageDownloadLocation = "https://invent.kde.org/mlaurent/plasma-assist"
+
+[[annotations]]
+path = ["po/**"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "none"
+SPDX-License-Identifier = "LGPL-2.0-or-later"
+
+[[annotations]]
+path = ["REUSE.toml", ".gersemirc"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "Laurent Montel <montel@kde.org>"
+SPDX-License-Identifier = "CC0-1.0"
+
+[[annotations]]
+path = ["README.md"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Laurent Montel <montel@kde.org>"
+SPDX-License-Identifier = "CC0-1.0"
+
+[[annotations]]
+path = ["CMakePresets.json"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Laurent Montel <montel@kde.org>"
+SPDX-License-Identifier = "BSD-3-Clause"
