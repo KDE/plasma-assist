@@ -3,6 +3,7 @@
 
   SPDX-License-Identifier: GPL-2.0-or-later
 */
+
 #include "troubleshooterserver.h"
 #include "config-plasma-assist.h"
 #include <TextAutoGenerateTextMcpProtocolCore/McpProtocolImplementation>

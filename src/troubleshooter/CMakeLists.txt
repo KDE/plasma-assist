@@ -24,7 +24,12 @@ endif()
 
 target_link_libraries(plasmaassisttroubleshooter PUBLIC KF6::TextAutoGenerateTextMcpProtocolCore PRIVATE KF6::I18n)
 
-add_executable(plasma-assist-troubleshooter main.cpp)
+add_executable(
+    plasma-assist-troubleshooter
+    main.cpp
+    modules/desktopmodule.h
+    modules/desktopmodule.cpp
+)
 target_link_libraries(
     plasma-assist-troubleshooter
     plasmaassisttroubleshooter
