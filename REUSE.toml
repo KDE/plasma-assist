@@ -22,6 +22,12 @@ SPDX-FileCopyrightText = "2026 Laurent Montel <montel@kde.org>"
 SPDX-License-Identifier = "CC0-1.0"
 
 [[annotations]]
+path = ["src/applet/metadata.json"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Laurent Montel <montel@kde.org>"
+SPDX-License-Identifier = "CC0-1.0"
+
+[[annotations]]
 path = ["CMakePresets.json"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Laurent Montel <montel@kde.org>"

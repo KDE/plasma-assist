@@ -1,0 +1,19 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "montel@kde.org",
+                "Name": "Laurent Montel"
+            }
+        ],
+        "Category": "System Information",
+        "Description": "Diagnose and fix common problems on Plasma desktop",
+        "EnabledByDefault": false,
+        "Icon": "help-browser",
+        "License": "GPL",
+        "Name": "Plasma Assist",
+        "Website": "https://invent.kde.org/mlaurent/plasma-assist"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "X-Plasma-NotificationAreaCategory": "SystemServices"
+}

@@ -116,8 +116,18 @@ set_package_properties(
 )
 
 set(KTEXTADDONS_WITH_MCPPROTOCOL_VERSION "2.2.52")
+set(PLASMA_MIN_VERSION "6.5.0")
 
-find_package(Qt6 ${QT_REQUIRED_VERSION} REQUIRED NO_MODULE COMPONENTS Core)
+find_package(
+    Qt6
+    ${QT_REQUIRED_VERSION}
+    REQUIRED
+    NO_MODULE
+    COMPONENTS
+        Core
+        DBus
+        Quick
+)
 find_package(
     KF6
     ${KF_MIN_VERSION}
@@ -125,6 +135,16 @@ find_package(
     COMPONENTS
         CoreAddons
         I18n
+)
+
+find_package(Plasma ${PLASMA_MIN_VERSION} REQUIRED)
+set_package_properties(
+    Plasma
+    PROPERTIES
+        TYPE
+            REQUIRED
+        PURPOSE
+            "Required to build the applet"
 )
 
 find_package(KF6TextAutoGenerateTextMcpProtocolCore ${KTEXTADDONS_WITH_MCPPROTOCOL_VERSION} CONFIG)

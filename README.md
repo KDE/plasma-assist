@@ -7,9 +7,9 @@ Assistant which helps to diagnose and fix common problems on KDE Plasma desktop
 
 - `plasma-assist-troubleshooter`: MCP server (stdio) which provides diagnostic tools
  (read only) and reversible actions.
-- `plasma-assistd`: daemon (D-Bus) which hosts conversations, language model and
- MCP client (planned).
-- Plasma applet: user interface (planned).
+- `plasma-assistd`: daemon (D-Bus service `org.kde.plasma.assist`) which hosts conversations,
+ language model and MCP client (skeleton).
+- `org.kde.plasma.assist`: Plasma applet, user interface (skeleton).
 
 Diagnostic tools are read only. Every action which changes the system needs an explicit
 confirmation and can be undone.
