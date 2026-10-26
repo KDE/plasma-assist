@@ -9,13 +9,14 @@
 #include <KAboutData>
 #include <KLocalizedString>
 #include <QCommandLineParser>
-#include <QCoreApplication>
+#include <QGuiApplication>
 
 using namespace Qt::Literals::StringLiterals;
 int main(int argc, char *argv[])
 {
     // stdout is used by MCP protocol: never write anything else on it
-    QCoreApplication app(argc, argv);
+    // QGuiApplication (not widgets): libkscreen Wayland backend needs it
+    QGuiApplication app(argc, argv);
 
     KLocalizedString::setApplicationDomain("plasma_assist"_ba);
 

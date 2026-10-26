@@ -48,10 +48,19 @@ QJsonObject readAnswer(QProcess &process)
     return QJsonDocument::fromJson(process.readLine()).object();
 }
 
+// Server is a QGuiApplication: it must start without display (CI)
+void startProcess(QProcess &process)
+{
+    QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
+    environment.insert(u"QT_QPA_PLATFORM"_s, u"offscreen"_s);
+    process.setProcessEnvironment(environment);
+    process.start(QStringLiteral(TROUBLESHOOTER_BINARY), {});
+}
+
 // Starts server and answers initialize
 bool startServer(QProcess &process)
 {
-    process.start(QStringLiteral(TROUBLESHOOTER_BINARY), {});
+    startProcess(process);
     if (!process.waitForStarted()) {
         return false;
     }
@@ -68,7 +77,7 @@ TroubleshooterServerTest::TroubleshooterServerTest(QObject *parent)
 void TroubleshooterServerTest::shouldAnswerInitialize()
 {
     QProcess process;
-    process.start(QStringLiteral(TROUBLESHOOTER_BINARY), {});
+    startProcess(process);
     QVERIFY(process.waitForStarted());
     process.write(initializeRequest());
 
@@ -110,6 +119,10 @@ void TroubleshooterServerTest::shouldListToolsWithAnnotations()
     }
     QVERIFY(names.contains(u"get_system_info"_s));
     QVERIFY(names.contains(u"get_disk_usage"_s));
+    QVERIFY(names.contains(u"list_audio_devices"_s));
+    QVERIFY(names.contains(u"list_audio_cards"_s));
+    QVERIFY(names.contains(u"list_audio_streams"_s));
+    QVERIFY(names.contains(u"list_outputs"_s));
 
     process.closeWriteChannel();
     QVERIFY(process.waitForFinished());
@@ -145,7 +158,7 @@ void TroubleshooterServerTest::shouldCallTool()
 void TroubleshooterServerTest::shouldExitWhenStdinIsClosed()
 {
     QProcess process;
-    process.start(QStringLiteral(TROUBLESHOOTER_BINARY), {});
+    startProcess(process);
     QVERIFY(process.waitForStarted());
     process.closeWriteChannel();
     QVERIFY(process.waitForFinished());

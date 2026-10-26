@@ -13,8 +13,20 @@ target_sources(
         troubleshooterserver.cpp
         core/toolhelpers.h
         core/toolhelpers.cpp
+        backends/audiobackend.h
+        backends/audiobackend.cpp
+        backends/pulseaudiobackend.h
+        backends/pulseaudiobackend.cpp
+        backends/displaybackend.h
+        backends/displaybackend.cpp
+        backends/kscreenbackend.h
+        backends/kscreenbackend.cpp
         modules/systemmodule.h
         modules/systemmodule.cpp
+        modules/audiomodule.h
+        modules/audiomodule.cpp
+        modules/displaymodule.h
+        modules/displaymodule.cpp
 )
 
 if(COMPILE_WITH_UNITY_CMAKE_SUPPORT)
@@ -35,6 +47,8 @@ target_link_libraries(
         Qt::Concurrent
         KF6::CoreAddons
         KF6::I18n
+        KF6::PulseAudioQt
+        KF6::Screen
 )
 
 add_executable(
@@ -46,6 +60,7 @@ add_executable(
 target_link_libraries(
     plasma-assist-troubleshooter
     plasmaassisttroubleshooter
+    Qt::Gui
     KF6::CoreAddons
     KF6::I18n
 )

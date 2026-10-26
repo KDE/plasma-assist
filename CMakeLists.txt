@@ -127,6 +127,7 @@ find_package(
         Core
         Concurrent
         DBus
+        Gui
         Quick
 )
 find_package(
@@ -146,6 +147,27 @@ set_package_properties(
             REQUIRED
         PURPOSE
             "Required to build the applet"
+)
+
+set(PULSEAUDIOQT_MIN_VERSION "1.6.0")
+find_package(KF6PulseAudioQt ${PULSEAUDIOQT_MIN_VERSION} REQUIRED)
+set_package_properties(
+    KF6PulseAudioQt
+    PROPERTIES
+        TYPE
+            REQUIRED
+        PURPOSE
+            "Required to diagnose audio problems"
+)
+
+find_package(KF6Screen ${PLASMA_MIN_VERSION} REQUIRED)
+set_package_properties(
+    KF6Screen
+    PROPERTIES
+        TYPE
+            REQUIRED
+        PURPOSE
+            "Required to diagnose display problems"
 )
 
 find_package(KF6TextAutoGenerateTextMcpProtocolCore ${KTEXTADDONS_WITH_MCPPROTOCOL_VERSION} CONFIG)
