@@ -149,7 +149,10 @@ void TroubleshooterServerTest::shouldCallTool()
     const QJsonObject result = answer.value("result"_L1).toObject();
     QVERIFY(!result.value("isError"_L1).toBool());
     QVERIFY(result.value("structuredContent"_L1).toObject().contains(expectedKey));
-    QVERIFY(!result.value("content"_L1).toArray().first().toObject().value("text"_L1).toString().isEmpty());
+    const QJsonArray content = result.value("content"_L1).toArray();
+    QVERIFY(!content.first().toObject().value("text"_L1).toString().isEmpty());
+    // Structured content is also sent as text
+    QCOMPARE(QJsonDocument::fromJson(content.last().toObject().value("text"_L1).toString().toUtf8()).object(), result.value("structuredContent"_L1).toObject());
 
     process.closeWriteChannel();
     QVERIFY(process.waitForFinished());

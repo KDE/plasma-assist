@@ -5,6 +5,7 @@
 */
 
 #include "toolhelpers.h"
+#include <QJsonDocument>
 #include <TextAutoGenerateTextMcpProtocolCore/McpProtocolCallToolResult>
 #include <TextAutoGenerateTextMcpProtocolCore/McpProtocolCommonUtils>
 #include <TextAutoGenerateTextMcpProtocolCore/McpProtocolMeta>
@@ -79,12 +80,14 @@ void ToolHelpers::finishWithJson(McpProtocolServerToolCall *call, const QJsonObj
 {
     McpProtocolTextContent content;
     content.setText(summary);
+    McpProtocolTextContent jsonContent;
+    jsonContent.setText(QString::fromUtf8(QJsonDocument(result).toJson(QJsonDocument::Compact)));
     QMap<QString, QJsonValue> structuredContent;
     for (auto it = result.constBegin(); it != result.constEnd(); ++it) {
         structuredContent.insert(it.key(), it.value());
     }
     McpProtocolCallToolResult toolResult;
-    toolResult.setContent({content});
+    toolResult.setContent({content, jsonContent});
     toolResult.setStructuredContent(structuredContent);
     call->finish(toolResult);
 }

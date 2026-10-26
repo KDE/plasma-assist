@@ -62,6 +62,7 @@ void addFunctionTool(TextAutoGenerateTextMcpProtocolCore::McpProtocolServerProto
                      const TextAutoGenerateTextMcpProtocolCore::McpProtocolTool &definition,
                      FunctionTool::Handler handler);
 
-// Answers with \a result as structuredContent and a short \a summary as text content
+// Answers with \a result as structuredContent, and with \a summary and serialized \a result as text contents:
+// clients which ignore structuredContent (e.g. ktextaddons) give only text to language model
 void finishWithJson(TextAutoGenerateTextMcpProtocolCore::McpProtocolServerToolCall *call, const QJsonObject &result, const QString &summary);
 }
