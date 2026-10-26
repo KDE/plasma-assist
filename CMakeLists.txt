@@ -116,6 +116,8 @@ set_package_properties(
 )
 
 set(KTEXTADDONS_WITH_MCPPROTOCOL_VERSION "2.2.52")
+# TextAutoGenerateMcpToolsManager is public
+set(KTEXTADDONS_MIN_VERSION "2.2.55")
 set(PLASMA_MIN_VERSION "6.5.0")
 
 find_package(
@@ -135,6 +137,7 @@ find_package(
     ${KF_MIN_VERSION}
     REQUIRED
     COMPONENTS
+        Config
         CoreAddons
         I18n
 )
@@ -180,6 +183,18 @@ set_package_properties(
             "Required for mcp protocol support"
         DESCRIPTION
             "MCP protocol library (ktextaddons)"
+)
+
+find_package(KF6TextAutoGenerateText ${KTEXTADDONS_MIN_VERSION} CONFIG)
+set_package_properties(
+    KF6TextAutoGenerateText
+    PROPERTIES
+        TYPE
+            REQUIRED
+        PURPOSE
+            "Required to talk with language model"
+        DESCRIPTION
+            "Language model library (ktextaddons)"
 )
 
 add_definitions(-DTRANSLATION_DOMAIN="plasma_assist")

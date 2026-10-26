@@ -11,7 +11,6 @@
 #include <QFileInfo>
 #include <QMetaEnum>
 #include <TextAutoGenerateTextMcpProtocolCore/McpProtocolSettings>
-#include <TextAutoGenerateTextMcpProtocolCore/McpServer>
 
 using namespace Qt::Literals::StringLiterals;
 using namespace TextAutoGenerateTextMcpProtocolCore;
@@ -43,6 +42,24 @@ QString TroubleshooterClient::serverPath()
         return sibling.absoluteFilePath();
     }
     return QStringLiteral(PLASMA_ASSIST_TROUBLESHOOTER_BINARY);
+}
+
+QByteArray TroubleshooterClient::serverIdentifier()
+{
+    return "plasma-assist-troubleshooter"_ba;
+}
+
+McpServer TroubleshooterClient::server()
+{
+    McpProtocolSettings settings;
+    settings.setCommand(serverPath());
+    McpServer server;
+    server.setIdentifier(serverIdentifier());
+    server.setName(u"Plasma Assist Troubleshooter"_s);
+    server.setTransportType(McpProtocolPlugin::TransportType::Stdio);
+    server.setSettings(settings);
+    server.setEnabled(true);
+    return server;
 }
 
 TroubleshooterClient::Status TroubleshooterClient::status() const
@@ -108,16 +125,7 @@ void TroubleshooterClient::stop()
 void TroubleshooterClient::start()
 {
     if (!mClient) {
-        McpProtocolSettings settings;
-        settings.setCommand(serverPath());
-        McpServer server;
-        server.setIdentifier("plasma-assist-troubleshooter"_ba);
-        server.setName(u"Plasma Assist Troubleshooter"_s);
-        server.setTransportType(McpProtocolPlugin::TransportType::Stdio);
-        server.setSettings(settings);
-        server.setEnabled(true);
-
-        mClient = new McpProtocolClientProtocolManager(server, this);
+        mClient = new McpProtocolClientProtocolManager(server(), this);
         mClient->setClientName(u"plasma-assistd"_s);
         connect(mClient, &McpProtocolClientProtocolManager::initialized, this, [this]() {
             mListToolsRequestId = mClient->executeAction(McpProtocolClientProtocolManager::MethodType::ListTools);

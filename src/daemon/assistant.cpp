@@ -7,13 +7,14 @@
 #include "assistant.h"
 #include "assistantadaptor.h"
 #include "config-plasma-assist.h"
+#include "conversationmanager.h"
 #include "plasmaassist_daemon_debug.h"
 #include "troubleshooterclient.h"
 #include <QDBusConnection>
+#include <QDateTime>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QUuid>
 
 using namespace Qt::Literals::StringLiterals;
 using namespace std::chrono_literals;
@@ -38,10 +39,40 @@ QJsonObject errorResult(const QString &message)
 Assistant::Assistant(QObject *parent)
     : QObject{parent}
     , mTroubleshooterClient(new TroubleshooterClient(this))
+    , mConversationManager(new ConversationManager(this))
 {
     new AssistantAdaptor(this);
-    connect(mTroubleshooterClient, &TroubleshooterClient::statusChanged, this, [this]() {
+    const auto emitStatusChanged = [this]() {
         Q_EMIT StatusChanged(Status());
+    };
+    connect(mTroubleshooterClient, &TroubleshooterClient::statusChanged, this, emitStatusChanged);
+    connect(mConversationManager, &ConversationManager::engineStatusChanged, this, emitStatusChanged);
+    connect(mConversationManager, &ConversationManager::conversationsChanged, this, &Assistant::ConversationsChanged);
+    connect(mConversationManager,
+            &ConversationManager::messageChunk,
+            this,
+            [this](const QByteArray &conversation, const QByteArray &messageId, const QString &text) {
+                restartIdleTimer();
+                Q_EMIT MessageChunk(QString::fromLatin1(conversation), QString::fromLatin1(messageId), text);
+            });
+    connect(mConversationManager, &ConversationManager::messageFinished, this, [this](const QByteArray &conversation, const QByteArray &messageId) {
+        restartIdleTimer();
+        Q_EMIT MessageFinished(QString::fromLatin1(conversation), QString::fromLatin1(messageId));
+    });
+    connect(mConversationManager,
+            &ConversationManager::toolCallStarted,
+            this,
+            [this](const QByteArray &conversation, const QString &callId, const QString &tool, const QString &argumentsJson) {
+                Q_EMIT ToolCallStarted(QString::fromLatin1(conversation), callId, tool, argumentsJson);
+            });
+    connect(mConversationManager,
+            &ConversationManager::toolCallFinished,
+            this,
+            [this](const QByteArray &conversation, const QString &callId, const QString &result, bool isError) {
+                Q_EMIT ToolCallFinished(QString::fromLatin1(conversation), callId, result, isError);
+            });
+    connect(mConversationManager, &ConversationManager::errorOccurred, this, [this](const QByteArray &conversation, const QString &error) {
+        Q_EMIT ConversationError(QString::fromLatin1(conversation), error);
     });
     mIdleTimer.setSingleShot(true);
     mIdleTimer.setInterval(10min);
@@ -70,13 +101,23 @@ TroubleshooterClient *Assistant::troubleshooterClient() const
     return mTroubleshooterClient;
 }
 
+ConversationManager *Assistant::conversationManager() const
+{
+    return mConversationManager;
+}
+
 QString Assistant::Status() const
 {
-    // TODO: report language model status
     const QJsonObject status{
         {u"version"_s, QStringLiteral(PLASMA_ASSIST_VERSION)},
-        {u"ready"_s, false},
-        {u"conversations"_s, mConversations.count()},
+        {u"ready"_s, mConversationManager->engineStatus() == ConversationManager::EngineStatus::Ready},
+        {u"languageModel"_s,
+         QJsonObject{
+             {u"status"_s, mConversationManager->engineStatusName()},
+             {u"error"_s, mConversationManager->errorString()},
+             {u"name"_s, mConversationManager->engineName()},
+             {u"model"_s, mConversationManager->modelName()},
+         }},
         {u"troubleshooter"_s,
          QJsonObject{
              {u"status"_s, mTroubleshooterClient->statusName()},
@@ -90,10 +131,48 @@ QString Assistant::Status() const
 QString Assistant::NewConversation()
 {
     restartIdleTimer();
-    const QString identifier = QUuid::createUuid().toString(QUuid::WithoutBraces);
-    mConversations.append(identifier);
-    Q_EMIT StatusChanged(Status());
-    return identifier;
+    return QString::fromLatin1(mConversationManager->newConversation());
+}
+
+QString Assistant::ListConversations()
+{
+    restartIdleTimer();
+    QJsonArray conversations;
+    const QList<ConversationManager::Conversation> list = mConversationManager->conversations();
+    for (const ConversationManager::Conversation &conversation : list) {
+        conversations.append(QJsonObject{
+            {u"id"_s, QString::fromLatin1(conversation.identifier)},
+            {u"title"_s, conversation.title},
+            {u"dateTime"_s, QDateTime::fromSecsSinceEpoch(conversation.dateTime).toString(Qt::ISODate)},
+        });
+    }
+    return QString::fromUtf8(QJsonDocument(conversations).toJson(QJsonDocument::Compact));
+}
+
+QString Assistant::GetMessages(const QString &conversation)
+{
+    restartIdleTimer();
+    if (!mConversationManager->hasConversation(conversation.toLatin1())) {
+        if (calledFromDBus()) {
+            sendErrorReply(QDBusError::InvalidArgs, u"Unknown conversation: %1"_s.arg(conversation));
+        }
+        return {};
+    }
+    return QString::fromUtf8(QJsonDocument(mConversationManager->messages(conversation.toLatin1())).toJson(QJsonDocument::Compact));
+}
+
+void Assistant::SendMessage(const QString &conversation, const QString &text)
+{
+    restartIdleTimer();
+    if (const QString error = mConversationManager->sendMessage(conversation.toLatin1(), text); !error.isEmpty() && calledFromDBus()) {
+        sendErrorReply(QDBusError::Failed, error);
+    }
+}
+
+void Assistant::Cancel(const QString &conversation)
+{
+    restartIdleTimer();
+    mConversationManager->cancel(conversation.toLatin1());
 }
 
 QString Assistant::ListTools()
@@ -152,7 +231,7 @@ void Assistant::restartIdleTimer()
 
 void Assistant::slotIdleTimeout()
 {
-    if (mTroubleshooterClient->hasPendingRequest()) {
+    if (mTroubleshooterClient->hasPendingRequest() || mConversationManager->hasConversationInProgress()) {
         restartIdleTimer();
         return;
     }

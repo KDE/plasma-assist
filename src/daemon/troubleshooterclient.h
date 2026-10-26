@@ -10,6 +10,7 @@
 #include <QObject>
 #include <QPointer>
 #include <TextAutoGenerateTextMcpProtocolCore/McpProtocolClientProtocolManager>
+#include <TextAutoGenerateTextMcpProtocolCore/McpServer>
 #include <functional>
 
 // MCP client of plasma-assist-troubleshooter (stdio): server is started on first request
@@ -33,6 +34,9 @@ public:
 
     // PLASMA_ASSIST_TROUBLESHOOTER environment variable, binary next to daemon (build directory) or installed binary
     [[nodiscard]] static QString serverPath();
+    [[nodiscard]] static QByteArray serverIdentifier();
+    // Stdio server which starts serverPath()
+    [[nodiscard]] static TextAutoGenerateTextMcpProtocolCore::McpServer server();
 
     [[nodiscard]] Status status() const;
     [[nodiscard]] QString statusName() const;

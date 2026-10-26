@@ -1,0 +1,442 @@
+/*
+  SPDX-FileCopyrightText: 2026 Laurent Montel <montel@kde.org>
+
+  SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
+#include "conversationmanager.h"
+#include "plasmaassist_daemon_debug.h"
+#include "troubleshooterclient.h"
+#include <KConfigGroup>
+#include <KLocalizedString>
+#include <KSharedConfig>
+#include <QDateTime>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QMetaEnum>
+#include <TextAutoGenerateText/TextAutoGenerateChatsModel>
+#include <TextAutoGenerateText/TextAutoGenerateLocalDatabaseManager>
+#include <TextAutoGenerateText/TextAutoGenerateManager>
+#include <TextAutoGenerateText/TextAutoGenerateMcpToolsManager>
+#include <TextAutoGenerateText/TextAutoGenerateMessagesModel>
+#include <TextAutoGenerateText/TextAutoGenerateTextPlugin>
+#include <TextAutoGenerateTextMcpProtocolCore/McpServerManager>
+#include <TextAutoGenerateTextMcpProtocolCore/McpServerModel>
+
+using namespace Qt::Literals::StringLiterals;
+using namespace std::chrono_literals;
+using namespace TextAutoGenerateText;
+
+namespace
+{
+constexpr int maximumTitleLength = 80;
+
+QString systemPrompt()
+{
+    return u"You are Plasma Assist, a troubleshooting assistant for the KDE Plasma desktop on Linux. "
+           "Use the available tools to diagnose the problem before answering: don't guess the state of the system. "
+           "Hints returned by tools point to likely causes. "
+           "Answer in the language of the user, be concise, and give concrete steps (System Settings, applets). "
+           "If a tool is refused, explain how users can make the change themselves."_s;
+}
+
+QJsonArray toolCalls(const QJsonArray &toolExchange, const std::function<QString(const QString &)> &toolName)
+{
+    // Tool exchange contains assistant entries (tool_calls) followed by their results (role "tool")
+    QHash<QString, QString> results;
+    for (const QJsonValue &entry : toolExchange) {
+        const QJsonObject obj = entry.toObject();
+        if (obj.value("role"_L1).toString() == "tool"_L1) {
+            results.insert(obj.value("tool_call_id"_L1).toString(), obj.value("content"_L1).toString());
+        }
+    }
+    QJsonArray calls;
+    for (const QJsonValue &entry : toolExchange) {
+        const QJsonArray entryCalls = entry.toObject().value("tool_calls"_L1).toArray();
+        for (const QJsonValue &call : entryCalls) {
+            QJsonObject obj = call.toObject();
+            obj.insert("name"_L1, toolName(obj.value("name"_L1).toString()));
+            obj.insert("result"_L1, results.value(obj.value("id"_L1).toString()));
+            calls.append(obj);
+        }
+    }
+    return calls;
+}
+}
+
+ConversationManager::ConversationManager(QObject *parent)
+    : QObject{parent}
+{
+    mEngineTimer.setSingleShot(true);
+    mEngineTimer.setInterval(30s);
+    connect(&mEngineTimer, &QTimer::timeout, this, [this]() {
+        setEngineStatus(EngineStatus::Error, i18n("Language model does not answer."));
+    });
+}
+
+ConversationManager::~ConversationManager() = default;
+
+bool ConversationManager::remoteLanguageModelAllowed()
+{
+    const KConfigGroup group(KSharedConfig::openConfig(u"plasma-assistrc"_s), u"General"_s);
+    return group.readEntry("AllowRemoteLanguageModel", false);
+}
+
+ConversationManager::EngineStatus ConversationManager::engineStatus() const
+{
+    return mEngineStatus;
+}
+
+QString ConversationManager::engineStatusName() const
+{
+    return QString::fromLatin1(QMetaEnum::fromType<EngineStatus>().valueToKey(static_cast<int>(mEngineStatus))).toLower();
+}
+
+QString ConversationManager::errorString() const
+{
+    return mErrorString;
+}
+
+QString ConversationManager::engineName() const
+{
+    if (!mManager || !mManager->textAutoGeneratePlugin()) {
+        return {};
+    }
+    return mManager->textAutoGeneratePlugin()->displayName();
+}
+
+QString ConversationManager::modelName() const
+{
+    if (!mManager || !mManager->textAutoGeneratePlugin()) {
+        return {};
+    }
+    return mManager->textAutoGeneratePlugin()->currentModel();
+}
+
+void ConversationManager::ensureManager()
+{
+    if (mManager) {
+        return;
+    }
+    mManager = new TextAutoGenerateManager(this);
+    mManager->setSystemPrompt(systemPrompt());
+    // Don't use loadHistory(): it creates an empty chat
+    mManager->textAutoGenerateChatsModel()->setChats(mManager->databaseManager()->loadChats());
+
+    // Server is only known by daemon: it's not saved in configuration of MCP servers
+    mManager->textAutoGenerateTextMcpServerManager()->mcpServerModel()->addMcpServer(TroubleshooterClient::server());
+    // TODO (M6): ask user with D-Bus signal. Until then tools which modify system are refused
+    mManager->textAutoGenerateMcpToolsManager()->setConfirmationHandler(
+        [](const TextAutoGenerateMcpToolsManager::ToolConfirmationInfo &info,
+           const std::function<void(TextAutoGenerateMcpToolsManager::ToolConfirmation)> &answer) {
+            qCWarning(PLASMA_ASSIST_DAEMON_LOG) << "Refuse tool which modifies system:" << info.tool.name;
+            answer(TextAutoGenerateMcpToolsManager::ToolConfirmation::Deny);
+        });
+
+    connect(mManager, &TextAutoGenerateManager::chatInProgressStatusChanged, this, &ConversationManager::slotConversationInProgressChanged);
+    connect(mManager, &TextAutoGenerateManager::errorOccurred, this, [this](QNetworkReply::NetworkError, const QString &error) {
+        // Error is not associated to a conversation
+        for (const QByteArray &conversation : std::as_const(mConversationsInProgress)) {
+            Q_EMIT errorOccurred(conversation, error);
+        }
+    });
+}
+
+void ConversationManager::loadEngine()
+{
+    setEngineStatus(EngineStatus::Loading);
+    connect(mManager, &TextAutoGenerateManager::pluginsInitializedDone, this, &ConversationManager::slotEngineLoaded, Qt::SingleShotConnection);
+    mEngineTimer.start();
+    mManager->loadEngine();
+    // Don't wait for initialization of a language model which can't be used
+    if (const QString error = engineError(); mEngineStatus == EngineStatus::Loading && !error.isEmpty()) {
+        mEngineTimer.stop();
+        disconnect(mManager, &TextAutoGenerateManager::pluginsInitializedDone, this, &ConversationManager::slotEngineLoaded);
+        setEngineStatus(EngineStatus::Error, error);
+    }
+}
+
+QString ConversationManager::engineError() const
+{
+    const TextAutoGenerateTextPlugin *plugin = mManager->textAutoGeneratePlugin();
+    if (!plugin) {
+        return i18n("No language model is configured.");
+    }
+    if (plugin->engineType() == TextAutoGenerateTextPlugin::EngineType::Network && !remoteLanguageModelAllowed()) {
+        // Information about system must not leave the computer without agreement of user
+        return i18n("Language model \"%1\" sends data to a remote server, it's not allowed. Select a local language model.", plugin->displayName());
+    }
+    return {};
+}
+
+void ConversationManager::slotEngineLoaded()
+{
+    mEngineTimer.stop();
+    if (const QString error = engineError(); !error.isEmpty()) {
+        setEngineStatus(EngineStatus::Error, error);
+    } else if (!mManager->textAutoGeneratePlugin()->ready()) {
+        setEngineStatus(EngineStatus::Error, i18n("Language model \"%1\" is not ready.", mManager->textAutoGeneratePlugin()->displayName()));
+    } else {
+        setEngineStatus(EngineStatus::Ready);
+    }
+}
+
+void ConversationManager::setEngineStatus(EngineStatus status, const QString &errorString)
+{
+    if (status == EngineStatus::Error) {
+        qCWarning(PLASMA_ASSIST_DAEMON_LOG) << "Language model error:" << errorString;
+    }
+    const bool changed = mEngineStatus != status || mErrorString != errorString;
+    mEngineStatus = status;
+    mErrorString = errorString;
+    if (status == EngineStatus::Ready || status == EngineStatus::Error) {
+        const QList<PendingMessage> messages = std::exchange(mPendingMessages, {});
+        for (const PendingMessage &message : messages) {
+            if (status == EngineStatus::Ready) {
+                send(message);
+            } else {
+                mConversationsInProgress.remove(message.conversation);
+                Q_EMIT errorOccurred(message.conversation, errorString);
+            }
+        }
+    }
+    if (changed) {
+        Q_EMIT engineStatusChanged();
+    }
+}
+
+QByteArray ConversationManager::newConversation()
+{
+    ensureManager();
+    const QList<QByteArray> previousConversations = mManager->textAutoGenerateChatsModel()->chatsId();
+    // New chat becomes current chat only when language model is initialized: look for it in chats
+    mManager->createNewChat({}, TextAutoGenerateChat::Persistence::Persisted);
+    const QList<QByteArray> conversations = mManager->textAutoGenerateChatsModel()->chatsId();
+    const auto it = std::ranges::find_if(conversations, [&previousConversations](const QByteArray &conversation) {
+        return !previousConversations.contains(conversation);
+    });
+    if (it == conversations.cend()) {
+        qCWarning(PLASMA_ASSIST_DAEMON_LOG) << "Impossible to create conversation";
+        return {};
+    }
+    Q_EMIT conversationsChanged();
+    return *it;
+}
+
+QList<ConversationManager::Conversation> ConversationManager::conversations()
+{
+    ensureManager();
+    const QList<TextAutoGenerateChat> chats = mManager->textAutoGenerateChatsModel()->chats();
+    QList<Conversation> result;
+    result.reserve(chats.count());
+    for (const TextAutoGenerateChat &chat : chats) {
+        result.append({.identifier = chat.identifier(), .title = chat.title(), .dateTime = chat.dateTime()});
+    }
+    return result;
+}
+
+bool ConversationManager::hasConversation(const QByteArray &conversation)
+{
+    ensureManager();
+    return mManager->textAutoGenerateChatsModel()->chatsId().contains(conversation);
+}
+
+TextAutoGenerateMessagesModel *ConversationManager::messagesModel(const QByteArray &conversation)
+{
+    if (!hasConversation(conversation)) {
+        return nullptr;
+    }
+    // Messages of conversation are loaded from database when it becomes current chat
+    mManager->setCurrentChatId(conversation);
+    watchConversation(conversation);
+    return mManager->messagesModelFromChatId(conversation);
+}
+
+QJsonArray ConversationManager::messages(const QByteArray &conversation)
+{
+    const TextAutoGenerateMessagesModel *model = messagesModel(conversation);
+    if (!model) {
+        return {};
+    }
+    QJsonArray result;
+    const QList<TextAutoGenerateMessage> messages = model->messages();
+    for (const TextAutoGenerateMessage &message : messages) {
+        result.append(QJsonObject{
+            {u"id"_s, QString::fromLatin1(message.uuid())},
+            {u"role"_s, message.sender() == TextAutoGenerateMessage::Sender::User ? u"user"_s : u"assistant"_s},
+            {u"text"_s, message.content()},
+            {u"dateTime"_s, QDateTime::fromSecsSinceEpoch(message.dateTime()).toString(Qt::ISODate)},
+            {u"inProgress"_s, message.inProgress()},
+            {u"toolCalls"_s,
+             toolCalls(message.toolExchange(),
+                       [this](const QString &exposedName) {
+                           return toolName(exposedName);
+                       })},
+        });
+    }
+    return result;
+}
+
+QString ConversationManager::sendMessage(const QByteArray &conversation, const QString &text)
+{
+    if (text.trimmed().isEmpty()) {
+        return i18n("Message is empty.");
+    }
+    if (!messagesModel(conversation)) {
+        return i18n("Conversation \"%1\" does not exist.", QString::fromLatin1(conversation));
+    }
+    if (mConversationsInProgress.contains(conversation)) {
+        return i18n("Conversation is waiting for an answer.");
+    }
+    mConversationsInProgress.insert(conversation);
+    const PendingMessage message{.conversation = conversation, .text = text};
+    switch (mEngineStatus) {
+    case EngineStatus::Ready:
+        send(message);
+        break;
+    case EngineStatus::Loading:
+        mPendingMessages.append(message);
+        break;
+    case EngineStatus::NotLoaded:
+    case EngineStatus::Error:
+        // Configuration can have changed since last error: try again
+        mPendingMessages.append(message);
+        loadEngine();
+        break;
+    }
+    return {};
+}
+
+void ConversationManager::send(const PendingMessage &message)
+{
+    TextAutoGenerateTextPlugin *plugin = mManager->textAutoGeneratePlugin();
+    setTitleIfEmpty(message.conversation, message.text);
+    plugin->sendMessage(TextAutoGenerateTextPlugin::EditSendInfo{
+        .message = message.text,
+        .messageUuid = {},
+        .chatId = message.conversation,
+        .tools = {TextAutoGenerateMcpToolsManager::toolIdentifier(TroubleshooterClient::serverIdentifier())},
+        .attachmentInfoList = {},
+    });
+}
+
+bool ConversationManager::cancel(const QByteArray &conversation)
+{
+    if (!mConversationsInProgress.contains(conversation)) {
+        return false;
+    }
+    const auto pending = std::ranges::find(mPendingMessages, conversation, &PendingMessage::conversation);
+    if (pending != mPendingMessages.end()) {
+        mPendingMessages.erase(pending);
+        mConversationsInProgress.remove(conversation);
+        return true;
+    }
+    TextAutoGenerateMessagesModel *model = messagesModel(conversation);
+    if (!model) {
+        return false;
+    }
+    return mManager->cancelRequest(conversation, model->indexForUuid(model->lastMessageUuid()));
+}
+
+bool ConversationManager::hasConversationInProgress() const
+{
+    return !mConversationsInProgress.isEmpty();
+}
+
+void ConversationManager::setTitleIfEmpty(const QByteArray &conversation, const QString &text)
+{
+    TextAutoGenerateChatsModel *chatsModel = mManager->textAutoGenerateChatsModel();
+    for (int row = 0; row < chatsModel->rowCount(); ++row) {
+        const QModelIndex index = chatsModel->index(row);
+        if (index.data(TextAutoGenerateChatsModel::Identifier).toByteArray() == conversation) {
+            if (chatsModel->title(conversation).isEmpty()) {
+                // Title is saved in database by manager
+                (void)chatsModel->setData(index, text.simplified().left(maximumTitleLength), TextAutoGenerateChatsModel::Title);
+                Q_EMIT conversationsChanged();
+            }
+            return;
+        }
+    }
+}
+
+void ConversationManager::watchConversation(const QByteArray &conversation)
+{
+    if (mWatchedConversations.contains(conversation)) {
+        return;
+    }
+    mWatchedConversations.insert(conversation);
+    const TextAutoGenerateMessagesModel *model = mManager->messagesModelFromChatId(conversation);
+    // Messages already loaded must not be sent again
+    const QList<TextAutoGenerateMessage> messages = model->messages();
+    for (const TextAutoGenerateMessage &message : messages) {
+        mSentAnswers.insert(message.uuid(), message.content());
+        mSentToolEntries.insert(message.uuid(), message.toolExchange().count());
+    }
+    connect(model, &QAbstractItemModel::dataChanged, this, [this, conversation, model](const QModelIndex &topLeft, const QModelIndex &bottomRight) {
+        for (int row = topLeft.row(); row <= bottomRight.row(); ++row) {
+            slotMessageChanged(conversation, model->index(row).data(TextAutoGenerateMessagesModel::UuidRole).toByteArray());
+        }
+    });
+    connect(model, &QAbstractItemModel::rowsInserted, this, [this, conversation, model](const QModelIndex &, int first, int last) {
+        for (int row = first; row <= last; ++row) {
+            slotMessageChanged(conversation, model->index(row).data(TextAutoGenerateMessagesModel::UuidRole).toByteArray());
+        }
+    });
+}
+
+void ConversationManager::slotMessageChanged(const QByteArray &conversation, const QByteArray &messageId)
+{
+    const TextAutoGenerateMessage message = mManager->messagesModelFromChatId(conversation)->message(messageId);
+    if (message.sender() != TextAutoGenerateMessage::Sender::Assistant) {
+        return;
+    }
+    // ktextaddons adds tool calls and their results together: both signals are emitted when results are known
+    const QJsonArray toolExchange = message.toolExchange();
+    qsizetype &sentEntries = mSentToolEntries[messageId];
+    for (; sentEntries < toolExchange.count(); ++sentEntries) {
+        const QJsonObject entry = toolExchange.at(sentEntries).toObject();
+        if (entry.value("role"_L1).toString() == "tool"_L1) {
+            // Result is the text given to language model: MCP error flag is not available
+            Q_EMIT toolCallFinished(conversation, entry.value("tool_call_id"_L1).toString(), entry.value("content"_L1).toString(), false);
+            continue;
+        }
+        const QJsonArray calls = entry.value("tool_calls"_L1).toArray();
+        for (const QJsonValue &value : calls) {
+            const QJsonObject call = value.toObject();
+            Q_EMIT toolCallStarted(conversation,
+                                   call.value("id"_L1).toString(),
+                                   toolName(call.value("name"_L1).toString()),
+                                   QString::fromUtf8(QJsonDocument(call.value("arguments"_L1).toObject()).toJson(QJsonDocument::Compact)));
+        }
+    }
+    if (const QString answer = message.content(); !answer.isEmpty() && mSentAnswers.value(messageId) != answer) {
+        mSentAnswers.insert(messageId, answer);
+        Q_EMIT messageChunk(conversation, messageId, answer);
+    }
+}
+
+void ConversationManager::slotConversationInProgressChanged(const QByteArray &conversation, bool inProgress)
+{
+    if (inProgress || !mConversationsInProgress.remove(conversation)) {
+        return;
+    }
+    const TextAutoGenerateMessagesModel *model = mManager->messagesModelFromChatId(conversation);
+    const QByteArray messageId = model ? model->lastMessageUuid() : QByteArray();
+    // Last chunk can be received after progress status
+    slotMessageChanged(conversation, messageId);
+    Q_EMIT messageFinished(conversation, messageId);
+}
+
+QString ConversationManager::toolName(const QString &exposedName) const
+{
+    if (const auto tool = mManager->textAutoGenerateMcpToolsManager()->tool(exposedName.toLatin1()); tool) {
+        return tool->name;
+    }
+    // Tools are unknown until server is connected: drop server prefix ("server__tool")
+    if (const qsizetype separator = exposedName.indexOf("__"_L1); separator >= 0) {
+        return exposedName.mid(separator + 2);
+    }
+    return exposedName;
+}
+
+#include "moc_conversationmanager.cpp"

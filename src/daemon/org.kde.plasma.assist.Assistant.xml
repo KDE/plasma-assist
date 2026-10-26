@@ -5,13 +5,32 @@
 -->
 <node>
   <interface name="org.kde.plasma.assist.Assistant">
-    <!-- JSON object: version, ready, conversations, troubleshooter (status, error, tools) -->
+    <!-- JSON object: version, ready, languageModel (status, error, name, model), troubleshooter (status, error, tools) -->
     <method name="Status">
       <arg type="s" direction="out"/>
     </method>
     <!-- Returns identifier of the new conversation -->
     <method name="NewConversation">
       <arg type="s" direction="out"/>
+    </method>
+    <!-- JSON array of conversations: id, title, dateTime -->
+    <method name="ListConversations">
+      <arg type="s" direction="out"/>
+    </method>
+    <!-- JSON array of messages: id, role (user, assistant), text, dateTime, inProgress, toolCalls (id, name, arguments, result) -->
+    <method name="GetMessages">
+      <arg name="conversation" type="s" direction="in"/>
+      <arg type="s" direction="out"/>
+    </method>
+    <!-- Sends message to language model, which can call tools. Answer is sent with MessageChunk and MessageFinished,
+         or ConversationError -->
+    <method name="SendMessage">
+      <arg name="conversation" type="s" direction="in"/>
+      <arg name="text" type="s" direction="in"/>
+    </method>
+    <!-- Stops answer in progress -->
+    <method name="Cancel">
+      <arg name="conversation" type="s" direction="in"/>
     </method>
     <!-- JSON array: tools of troubleshooter server (MCP tools/list) -->
     <method name="ListTools">
@@ -26,6 +45,33 @@
     </method>
     <signal name="StatusChanged">
       <arg name="status" type="s" direction="out"/>
+    </signal>
+    <signal name="ConversationsChanged"/>
+    <!-- text: whole answer received so far -->
+    <signal name="MessageChunk">
+      <arg name="conversation" type="s" direction="out"/>
+      <arg name="messageId" type="s" direction="out"/>
+      <arg name="text" type="s" direction="out"/>
+    </signal>
+    <signal name="MessageFinished">
+      <arg name="conversation" type="s" direction="out"/>
+      <arg name="messageId" type="s" direction="out"/>
+    </signal>
+    <signal name="ToolCallStarted">
+      <arg name="conversation" type="s" direction="out"/>
+      <arg name="callId" type="s" direction="out"/>
+      <arg name="tool" type="s" direction="out"/>
+      <arg name="argumentsJson" type="s" direction="out"/>
+    </signal>
+    <signal name="ToolCallFinished">
+      <arg name="conversation" type="s" direction="out"/>
+      <arg name="callId" type="s" direction="out"/>
+      <arg name="result" type="s" direction="out"/>
+      <arg name="isError" type="b" direction="out"/>
+    </signal>
+    <signal name="ConversationError">
+      <arg name="conversation" type="s" direction="out"/>
+      <arg name="error" type="s" direction="out"/>
     </signal>
   </interface>
 </node>

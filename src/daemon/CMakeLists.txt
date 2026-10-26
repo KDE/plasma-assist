@@ -14,6 +14,8 @@ target_sources(
     PRIVATE
         assistant.h
         assistant.cpp
+        conversationmanager.h
+        conversationmanager.cpp
         troubleshooterclient.h
         troubleshooterclient.cpp
         ${plasmaassistdaemon_dbus_SRCS}
@@ -37,6 +39,9 @@ target_link_libraries(
     plasmaassistdaemon
     PUBLIC
         Qt::DBus
+        KF6::ConfigCore
+        KF6::I18n
+        KF6::TextAutoGenerateText
         KF6::TextAutoGenerateTextMcpProtocolCore
 )
 
