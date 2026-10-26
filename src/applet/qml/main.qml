@@ -10,17 +10,23 @@ import QtQuick.Layouts
 import org.kde.plasma.plasmoid
 import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.extras as PlasmaExtras
-import org.kde.plasma.components as PlasmaComponents3
 import org.kde.kirigami as Kirigami
 
 PlasmoidItem {
     id: root
 
     Plasmoid.icon: "help-browser"
-    Plasmoid.status: PlasmaCore.Types.PassiveStatus
+    // Hidden in system tray until a conversation is in progress
+    Plasmoid.status: Plasmoid.answerInProgress ? PlasmaCore.Types.ActiveStatus : PlasmaCore.Types.PassiveStatus
 
     toolTipMainText: i18n("Plasma Assist")
-    toolTipSubText: i18n("Diagnose and fix common problems")
+    toolTipSubText: Plasmoid.answerInProgress ? i18n("Assistant is answering…") : i18n("Diagnose and fix common problems")
+
+    onExpandedChanged: {
+        if (expanded && !Plasmoid.conversationOpen) {
+            Plasmoid.refreshConversations();
+        }
+    }
 
     fullRepresentation: PlasmaExtras.Representation {
         Layout.minimumWidth: Kirigami.Units.gridUnit * 18
@@ -30,22 +36,19 @@ PlasmoidItem {
 
         collapseMarginsHint: true
 
-        PlasmaExtras.PlaceholderMessage {
-            anchors.centerIn: parent
-            width: parent.width - Kirigami.Units.gridUnit * 4
+        Loader {
+            anchors.fill: parent
+            sourceComponent: Plasmoid.conversationOpen ? conversationPage : homePage
+        }
 
-            iconName: Plasmoid.daemonAvailable ? "help-browser" : "dialog-warning"
-            text: Plasmoid.daemonAvailable ? i18n("Plasma Assist") : i18n("Assistant service is not running")
-            // TODO: show scenarios and conversation
-            explanation: Plasmoid.daemonAvailable ? i18n("Not implemented yet.") : ""
+        Component {
+            id: homePage
+            HomePage {}
+        }
 
-            helpfulAction: Kirigami.Action {
-                enabled: !Plasmoid.daemonAvailable
-                visible: enabled
-                icon.name: "system-run"
-                text: i18n("Start Service")
-                onTriggered: Plasmoid.startDaemon()
-            }
+        Component {
+            id: conversationPage
+            ConversationPage {}
         }
     }
 }
