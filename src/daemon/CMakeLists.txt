@@ -14,6 +14,8 @@ target_sources(
     PRIVATE
         assistant.h
         assistant.cpp
+        troubleshooterclient.h
+        troubleshooterclient.cpp
         ${plasmaassistdaemon_dbus_SRCS}
 )
 
@@ -26,7 +28,17 @@ if(COMPILE_WITH_UNITY_CMAKE_SUPPORT)
     )
 endif()
 
-target_link_libraries(plasmaassistdaemon PUBLIC Qt::DBus)
+target_compile_definitions(
+    plasmaassistdaemon
+    PRIVATE
+        PLASMA_ASSIST_TROUBLESHOOTER_BINARY="${KDE_INSTALL_FULL_BINDIR}/plasma-assist-troubleshooter"
+)
+target_link_libraries(
+    plasmaassistdaemon
+    PUBLIC
+        Qt::DBus
+        KF6::TextAutoGenerateTextMcpProtocolCore
+)
 
 add_executable(plasma-assistd main.cpp)
 target_link_libraries(

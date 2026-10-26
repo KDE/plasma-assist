@@ -16,5 +16,10 @@ public:
 
 private Q_SLOTS:
     void shouldHaveDefaultStatus();
+    void initTestCase();
     void shouldCreateConversation();
+    void shouldStartTroubleshooterOnDemand();
+    void shouldCallToolWithoutLanguageModel();
+    void shouldReturnErrorForUnknownTool();
+    void shouldRejectInvalidArguments();
 };

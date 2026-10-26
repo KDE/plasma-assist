@@ -7,6 +7,8 @@ macro(add_plasma_assist_daemon_unittest _source)
         NAME_PREFIX "plasma-assist-daemon-"
         LINK_LIBRARIES Qt::Test plasmaassistdaemon
     )
+    # Tests call troubleshooter built next to them
+    add_dependencies(${_name} plasma-assist-troubleshooter)
 endmacro()
 
 add_plasma_assist_daemon_unittest(assistanttest.cpp)

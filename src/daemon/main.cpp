@@ -37,5 +37,7 @@ int main(int argc, char *argv[])
     if (!assistant.registerOnSessionBus()) {
         return 1;
     }
+    // Started again by D-Bus activation when needed
+    QObject::connect(&assistant, &Assistant::idleTimeout, &app, &QCoreApplication::quit);
     return app.exec();
 }
