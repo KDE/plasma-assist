@@ -11,6 +11,10 @@ target_sources(
     PRIVATE
         troubleshooterserver.h
         troubleshooterserver.cpp
+        core/toolhelpers.h
+        core/toolhelpers.cpp
+        modules/systemmodule.h
+        modules/systemmodule.cpp
 )
 
 if(COMPILE_WITH_UNITY_CMAKE_SUPPORT)
@@ -22,7 +26,16 @@ if(COMPILE_WITH_UNITY_CMAKE_SUPPORT)
     )
 endif()
 
-target_link_libraries(plasmaassisttroubleshooter PUBLIC KF6::TextAutoGenerateTextMcpProtocolCore PRIVATE KF6::I18n)
+target_include_directories(plasmaassisttroubleshooter PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(
+    plasmaassisttroubleshooter
+    PUBLIC
+        KF6::TextAutoGenerateTextMcpProtocolCore
+    PRIVATE
+        Qt::Concurrent
+        KF6::CoreAddons
+        KF6::I18n
+)
 
 add_executable(
     plasma-assist-troubleshooter

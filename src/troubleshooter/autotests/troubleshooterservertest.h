@@ -16,5 +16,8 @@ public:
 
 private Q_SLOTS:
     void shouldAnswerInitialize();
+    void shouldListToolsWithAnnotations();
+    void shouldCallTool_data();
+    void shouldCallTool();
     void shouldExitWhenStdinIsClosed();
 };

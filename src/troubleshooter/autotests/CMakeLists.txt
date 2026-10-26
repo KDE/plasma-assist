@@ -12,3 +12,4 @@ macro(add_plasma_assist_troubleshooter_unittest _source)
 endmacro()
 
 add_plasma_assist_troubleshooter_unittest(troubleshooterservertest.cpp)
+add_plasma_assist_troubleshooter_unittest(systemmoduletest.cpp)

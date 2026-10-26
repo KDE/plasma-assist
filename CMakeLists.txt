@@ -125,6 +125,7 @@ find_package(
     NO_MODULE
     COMPONENTS
         Core
+        Concurrent
         DBus
         Quick
 )

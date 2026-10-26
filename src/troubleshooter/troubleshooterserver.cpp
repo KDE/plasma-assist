@@ -6,6 +6,7 @@
 
 #include "troubleshooterserver.h"
 #include "config-plasma-assist.h"
+#include "modules/systemmodule.h"
 #include <TextAutoGenerateTextMcpProtocolCore/McpProtocolImplementation>
 
 using namespace Qt::Literals::StringLiterals;
@@ -19,6 +20,8 @@ TroubleshooterServer::TroubleshooterServer(QObject *parent)
     serverInfo.setVersion(QStringLiteral(PLASMA_ASSIST_VERSION));
     setServerInfo(serverInfo);
     setInstructions(u"Tools to diagnose and fix problems on KDE Plasma desktop. Always diagnose before proposing an action."_s);
+
+    SystemModule::registerTools(this);
 }
 
 TroubleshooterServer::~TroubleshooterServer() = default;
