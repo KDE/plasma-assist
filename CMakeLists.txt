@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Laurent Montel <montel@kde.org>
 # SPDX-License-Identifier: BSD-3-Clause
 cmake_minimum_required(VERSION 3.29.0)
-set(PLASMA_ASSIST_VERSION "0.1.0")
+set(PLASMA_ASSIST_VERSION "0.2.0")
 project(plasma-assist VERSION ${PLASMA_ASSIST_VERSION})
 
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -9,7 +9,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 # TODO: update it in each release version
-set(PLASMA_ASSIST_RELEASE_VERSION "26.10.22") # yy.MM.dd
+set(PLASMA_ASSIST_RELEASE_VERSION "26.11.22") # yy.MM.dd
 
 # Use true if stable version => we will check specific version
 set(PLASMA_ASSIST_STABLE_VERSION false)
@@ -115,9 +115,8 @@ set_package_properties(
             OPTIONAL
 )
 
-set(KTEXTADDONS_WITH_MCPPROTOCOL_VERSION "2.2.52")
-# TextAutoGenerateMcpToolsManager is public
-set(KTEXTADDONS_MIN_VERSION "2.2.55")
+set(KTEXTADDONS_WITH_MCPPROTOCOL_VERSION "2.2.57")
+set(KTEXTADDONS_MIN_VERSION ${KTEXTADDONS_WITH_MCPPROTOCOL_VERSION})
 set(PLASMA_MIN_VERSION "6.5.0")
 
 find_package(
