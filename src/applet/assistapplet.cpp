@@ -66,6 +66,7 @@ AssistApplet::AssistApplet(QObject *parent, const KPluginMetaData &data, const Q
             });
     connect(mInterface, &OrgKdePlasmaAssistAssistantInterface::MessageFinished, this, [this](const QString &conversation) {
         if (conversation == mConversationId) {
+            mScenario.clear();
             setAnswerInProgress(false);
         }
     });
@@ -110,8 +111,13 @@ AssistApplet::AssistApplet(QObject *parent, const KPluginMetaData &data, const Q
     });
     connect(mInterface, &OrgKdePlasmaAssistAssistantInterface::ChangesChanged, this, &AssistApplet::refreshChanges);
     connect(mInterface, &OrgKdePlasmaAssistAssistantInterface::ConversationError, this, [this](const QString &conversation, const QString &error) {
-        if (conversation == mConversationId) {
-            showError(error);
+        if (conversation != mConversationId) {
+            return;
+        }
+        showError(error);
+        // Diagnostic of scenario is possible without language model
+        if (const QString scenario = std::exchange(mScenario, {}); !scenario.isEmpty()) {
+            runQuickDiagnostic(scenario);
         }
     });
     setDaemonAvailable(QDBusConnection::sessionBus().interface()->isServiceRegistered(serviceName));
@@ -252,25 +258,79 @@ void AssistApplet::sendMessage(const QString &text)
     if (message.isEmpty() || mAnswerInProgress) {
         return;
     }
+    mScenario.clear();
+    startRequest(message, [this, message]() {
+        send(message);
+    });
+}
+
+void AssistApplet::startScenario(const QString &scenario)
+{
+    if (mAnswerInProgress) {
+        return;
+    }
+    // Prompt of scenario is long: its title is shown instead
+    mScenario = scenario;
+    startRequest(mScenarioModel->title(scenario), [this, scenario]() {
+        onReply<>(this, mInterface->StartScenario(mConversationId, scenario, QString()), [this](const QDBusPendingReply<> &reply) {
+            if (reply.isError()) {
+                showError(reply.error().message());
+            }
+        });
+    });
+}
+
+void AssistApplet::startRequest(const QString &userMessage, const std::function<void()> &request)
+{
     if (!mConversationOpen) {
         mConversationId.clear();
         mConversationModel->clear();
         setConversationOpen(true);
     }
-    mConversationModel->addUserMessage(message);
+    mConversationModel->addUserMessage(userMessage);
     setAnswerInProgress(true);
     if (!mConversationId.isEmpty()) {
-        send(message);
+        request();
         return;
     }
     // Daemon is started by D-Bus activation if needed
-    onReply<QString>(this, mInterface->NewConversation(), [this, message](const QDBusPendingReply<QString> &reply) {
+    onReply<QString>(this, mInterface->NewConversation(), [this, request](const QDBusPendingReply<QString> &reply) {
         if (reply.isError() || reply.value().isEmpty()) {
             showError(i18n("Impossible to start a conversation: %1", reply.error().message()));
             return;
         }
         mConversationId = reply.value();
-        send(message);
+        request();
+    });
+}
+
+void AssistApplet::runQuickDiagnostic(const QString &scenario)
+{
+    mConversationModel->addNotice(i18n("No language model is available: quick diagnostic without assistant."));
+    setAnswerInProgress(true);
+    const QString conversation = mConversationId;
+    onReply<QString>(this, mInterface->QuickDiagnostic(scenario), [this, conversation](const QDBusPendingReply<QString> &reply) {
+        if (conversation != mConversationId) {
+            return;
+        }
+        if (reply.isError()) {
+            showError(reply.error().message());
+            return;
+        }
+        // Not saved in conversation: it's not an answer of assistant
+        mConversationModel->setAnswer(u"quick-diagnostic"_s, reply.value());
+        setAnswerInProgress(false);
+    });
+}
+
+void AssistApplet::refreshScenarios()
+{
+    onReply<QString>(this, mInterface->ListScenarios(), [this](const QDBusPendingReply<QString> &reply) {
+        if (reply.isError()) {
+            qCWarning(PLASMA_ASSIST_APPLET_LOG) << "Impossible to list scenarios:" << reply.error().message();
+            return;
+        }
+        mScenarioModel->setScenarios(reply.value());
     });
 }
 
@@ -353,6 +413,7 @@ void AssistApplet::setDaemonAvailable(bool available)
     if (mDaemonAvailable) {
         fetchStatus();
         refreshConversations();
+        refreshScenarios();
     } else {
         setDaemonStatus({});
         if (mAnswerInProgress) {

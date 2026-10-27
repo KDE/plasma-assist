@@ -66,16 +66,19 @@ PlasmaComponents3.ScrollView {
                 model: Plasmoid.scenarioModel
 
                 PlasmaComponents3.Button {
+                    required property string identifier
                     required property string title
                     required property string iconName
-                    required property string prompt
+                    required property string description
 
                     Layout.fillWidth: true
                     Layout.preferredWidth: 1
                     icon.name: iconName
                     text: title
-                    Accessible.description: prompt
-                    onClicked: Plasmoid.sendMessage(prompt)
+                    Accessible.description: description
+                    PlasmaComponents3.ToolTip.text: description
+                    PlasmaComponents3.ToolTip.visible: hovered && description.length > 0
+                    onClicked: Plasmoid.startScenario(identifier)
                 }
             }
         }

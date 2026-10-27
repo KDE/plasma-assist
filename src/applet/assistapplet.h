@@ -7,6 +7,7 @@
 
 #include <Plasma/Applet>
 #include <QAbstractListModel>
+#include <functional>
 
 class ConversationModel;
 class OrgKdePlasmaAssistAssistantInterface;
@@ -59,6 +60,8 @@ public:
     Q_INVOKABLE void startDaemon();
     // Sends \a text in current conversation, a conversation is created when none is open
     Q_INVOKABLE void sendMessage(const QString &text);
+    // Guided scenario of server (identifier of scenario model). Without language model, its diagnostic tools are run
+    Q_INVOKABLE void startScenario(const QString &scenario);
     Q_INVOKABLE void cancel();
     Q_INVOKABLE void openConversation(const QString &identifier);
     // Back to home page
@@ -86,6 +89,10 @@ private:
     void setConversationOpen(bool open);
     void setAnswerInProgress(bool inProgress);
     void send(const QString &text);
+    // Opens conversation, shows \a userMessage and calls \a request when conversation exists
+    void startRequest(const QString &userMessage, const std::function<void()> &request);
+    void runQuickDiagnostic(const QString &scenario);
+    void refreshScenarios();
     void showError(const QString &error);
     void updateConfirmationPending();
 
@@ -95,6 +102,8 @@ private:
     ConversationModel *const mConversationModel;
     QString mDaemonStatus;
     QString mConversationId;
+    // Scenario waiting for its answer
+    QString mScenario;
     QVariantList mRecentConversations;
     QVariantList mChanges;
     QString mChangesError;
