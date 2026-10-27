@@ -43,10 +43,13 @@ public:
     [[nodiscard]] QString errorString() const;
     // Tools sent by server (tools/list)
     [[nodiscard]] QJsonArray tools() const;
+    // Prompts sent by server (prompts/list): guided scenarios
+    [[nodiscard]] QJsonArray prompts() const;
 
     // \a callback is not called when \a context is deleted
     void whenReady(QObject *context, const std::function<void(const QString &error)> &callback);
     void callTool(const QString &name, const QJsonObject &arguments, QObject *context, const AnswerCallback &callback);
+    void getPrompt(const QString &name, const QMap<QString, QString> &arguments, QObject *context, const AnswerCallback &callback);
     [[nodiscard]] bool hasPendingRequest() const;
 
     void stop();
@@ -63,11 +66,14 @@ private:
     void setStatus(Status status, const QString &errorString = {});
     void slotReceived(const QJsonObject &obj, TextAutoGenerateTextMcpProtocolCore::McpProtocolClientProtocolManager::MethodType type);
     void failPendingRequests(const QString &error);
+    void setReadyWhenListsAreReceived();
 
     TextAutoGenerateTextMcpProtocolCore::McpProtocolClientProtocolManager *mClient = nullptr;
     QList<PendingAction> mPendingActions;
     QHash<qint64, std::pair<QPointer<QObject>, AnswerCallback>> mPendingCalls;
     QJsonArray mTools;
+    QJsonArray mPrompts;
+    qint64 mListPromptsRequestId = -1;
     QString mErrorString;
     qint64 mListToolsRequestId = -1;
     Status mStatus = Status::Stopped;

@@ -82,6 +82,11 @@ QJsonArray TroubleshooterClient::tools() const
     return mTools;
 }
 
+QJsonArray TroubleshooterClient::prompts() const
+{
+    return mPrompts;
+}
+
 bool TroubleshooterClient::hasPendingRequest() const
 {
     return !mPendingActions.isEmpty() || !mPendingCalls.isEmpty();
@@ -115,6 +120,22 @@ void TroubleshooterClient::callTool(const QString &name, const QJsonObject &argu
     });
 }
 
+void TroubleshooterClient::getPrompt(const QString &name, const QMap<QString, QString> &arguments, QObject *context, const AnswerCallback &callback)
+{
+    whenReady(context, [this, name, arguments, context, callback](const QString &error) {
+        if (!error.isEmpty()) {
+            callback(errorAnswer(error));
+            return;
+        }
+        const qint64 requestId = mClient->getPrompt(name, arguments);
+        if (requestId < 0) {
+            callback(errorAnswer(u"Impossible to get prompt %1"_s.arg(name)));
+            return;
+        }
+        mPendingCalls.insert(requestId, {context, callback});
+    });
+}
+
 void TroubleshooterClient::stop()
 {
     if (mClient) {
@@ -128,7 +149,9 @@ void TroubleshooterClient::start()
         mClient = new McpProtocolClientProtocolManager(server(), this);
         mClient->setClientName(u"plasma-assistd"_s);
         connect(mClient, &McpProtocolClientProtocolManager::initialized, this, [this]() {
+            // Server is ready when tools and prompts are known
             mListToolsRequestId = mClient->executeAction(McpProtocolClientProtocolManager::MethodType::ListTools);
+            mListPromptsRequestId = mClient->executeAction(McpProtocolClientProtocolManager::MethodType::ListPrompts);
         });
         connect(mClient, &McpProtocolClientProtocolManager::received, this, &TroubleshooterClient::slotReceived);
         connect(mClient, &McpProtocolClientProtocolManager::error, this, [this](const QString &error) {
@@ -159,19 +182,34 @@ void TroubleshooterClient::slotReceived(const QJsonObject &obj, McpProtocolClien
             return;
         }
         mTools = obj.value("result"_L1).toObject().value("tools"_L1).toArray();
-        setStatus(Status::Ready);
-        const QList<PendingAction> actions = std::exchange(mPendingActions, {});
-        for (const PendingAction &action : actions) {
-            if (action.context) {
-                action.callback({});
-            }
-        }
+        setReadyWhenListsAreReceived();
         return;
     }
-    if (type == McpProtocolClientProtocolManager::MethodType::CallTool) {
+    if (type == McpProtocolClientProtocolManager::MethodType::ListPrompts && requestId == mListPromptsRequestId) {
+        mListPromptsRequestId = -1;
+        // Scenarios are optional
+        mPrompts = obj.value("result"_L1).toObject().value("prompts"_L1).toArray();
+        setReadyWhenListsAreReceived();
+        return;
+    }
+    if (type == McpProtocolClientProtocolManager::MethodType::CallTool || type == McpProtocolClientProtocolManager::MethodType::GetPrompt) {
         const auto pending = mPendingCalls.take(requestId);
         if (pending.first) {
             pending.second(obj);
+        }
+    }
+}
+
+void TroubleshooterClient::setReadyWhenListsAreReceived()
+{
+    if (mListToolsRequestId >= 0 || mListPromptsRequestId >= 0 || mStatus != Status::Starting) {
+        return;
+    }
+    setStatus(Status::Ready);
+    const QList<PendingAction> actions = std::exchange(mPendingActions, {});
+    for (const PendingAction &action : actions) {
+        if (action.context) {
+            action.callback({});
         }
     }
 }

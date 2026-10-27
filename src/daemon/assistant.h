@@ -9,6 +9,7 @@
 #include <QHash>
 #include <QJsonObject>
 #include <QObject>
+#include <QStringList>
 #include <QTimer>
 #include <functional>
 
@@ -47,6 +48,9 @@ public:
     bool Confirm(const QString &requestId, int answer);
     void SetActionsAllowed(bool allowed);
     QString ListChanges();
+    QString ListScenarios();
+    void StartScenario(const QString &conversation, const QString &scenario, const QString &details);
+    QString QuickDiagnostic(const QString &scenario);
     QString UndoChange(const QString &changeId);
 
 Q_SIGNALS:
@@ -74,6 +78,13 @@ private:
     void callServerTool(const QString &name, const QJsonObject &arguments, QObject *context, const std::function<void(const QJsonObject &result)> &callback);
     // Unknown tools are considered as read only: server answers with an error
     [[nodiscard]] bool isReadOnlyTool(const QString &name) const;
+    [[nodiscard]] QString toolTitle(const QString &name) const;
+    // Read-only tools of scenario called without language model
+    [[nodiscard]] QStringList diagnosticTools(const QString &scenario) const;
+    // Calls \a tools one after another and adds their whole results (for language model) to \a results
+    void collectToolResults(const QStringList &tools, const QString &results, const std::function<void(const QString &results)> &callback);
+    // Calls \a tools one after another and adds their summaries to \a markdown
+    void runQuickDiagnostic(const QStringList &tools, const QString &markdown, const std::function<void(const QString &markdown)> &callback);
     void restartIdleTimer();
     void slotIdleTimeout();
 

@@ -324,6 +324,168 @@ QString Assistant::ListChanges()
     return {};
 }
 
+QString Assistant::ListScenarios()
+{
+    restartIdleTimer();
+    if (!calledFromDBus()) {
+        return {};
+    }
+    setDelayedReply(true);
+    mTroubleshooterClient->whenReady(this, [this, request = message(), bus = connection()](const QString &error) {
+        if (!error.isEmpty()) {
+            bus.send(request.createErrorReply(QDBusError::Failed, error));
+            return;
+        }
+        QJsonArray scenarios;
+        const QJsonArray prompts = mTroubleshooterClient->prompts();
+        for (const QJsonValue &value : prompts) {
+            const QJsonObject prompt = value.toObject();
+            const QJsonObject meta = prompt.value("_meta"_L1).toObject();
+            scenarios.append(QJsonObject{
+                {u"name"_s, prompt.value("name"_L1)},
+                {u"title"_s, prompt.value("title"_L1)},
+                {u"description"_s, prompt.value("description"_L1)},
+                {u"icon"_s, meta.value("org.kde/icon"_L1)},
+                {u"diagnosticTools"_s, meta.value("org.kde/diagnosticTools"_L1)},
+            });
+        }
+        bus.send(request.createReply(QString::fromUtf8(QJsonDocument(scenarios).toJson(QJsonDocument::Compact))));
+    });
+    return {};
+}
+
+void Assistant::StartScenario(const QString &conversation, const QString &scenario, const QString &details)
+{
+    restartIdleTimer();
+    if (!calledFromDBus()) {
+        return;
+    }
+    setDelayedReply(true);
+    // Prompt of server tells language model which tools to call: it's sent as message of user
+    mTroubleshooterClient->getPrompt(
+        scenario,
+        {{u"details"_s, details}},
+        this,
+        [this, scenario, conversation, request = message(), bus = connection()](const QJsonObject &answer) {
+            const QJsonArray messages = answer.value("result"_L1).toObject().value("messages"_L1).toArray();
+            if (messages.isEmpty()) {
+                const QString error = answer.value("error"_L1).toObject().value("message"_L1).toString();
+                bus.send(request.createErrorReply(QDBusError::InvalidArgs, error.isEmpty() ? u"Unknown scenario"_s : error));
+                return;
+            }
+            if (!mConversationManager->hasConversation(conversation.toLatin1())) {
+                bus.send(request.createErrorReply(QDBusError::InvalidArgs, u"Unknown conversation: %1"_s.arg(conversation)));
+                return;
+            }
+            QStringList texts;
+            for (const QJsonValue &value : messages) {
+                texts.append(value.toObject().value("content"_L1).toObject().value("text"_L1).toString());
+            }
+            // Errors are sent with ConversationError, like answers
+            bus.send(request.createReply());
+            // Diagnostic tools are called first: small language models often fail to call them
+            collectToolResults(diagnosticTools(scenario),
+                               {},
+                               [this, conversation, prompt = texts.join(u"\n\n"_s), client = request.service()](const QString &results) {
+                                   QString text = prompt;
+                                   if (!results.isEmpty()) {
+                                       text += u"\n\nResults of the first diagnostic tools (already called, don't call them again):\n"_s + results;
+                                   }
+                                   mConversationManager->sendScenario(conversation.toLatin1(), text, client);
+                               });
+        });
+}
+
+QStringList Assistant::diagnosticTools(const QString &scenario) const
+{
+    QStringList tools;
+    const QJsonArray prompts = mTroubleshooterClient->prompts();
+    for (const QJsonValue &value : prompts) {
+        if (value.toObject().value("name"_L1).toString() != scenario) {
+            continue;
+        }
+        const QJsonArray diagnosticTools = value.toObject().value("_meta"_L1).toObject().value("org.kde/diagnosticTools"_L1).toArray();
+        for (const QJsonValue &tool : diagnosticTools) {
+            // Never an action, even if server lists one
+            if (isReadOnlyTool(tool.toString())) {
+                tools.append(tool.toString());
+            }
+        }
+    }
+    return tools;
+}
+
+void Assistant::collectToolResults(const QStringList &tools, const QString &results, const std::function<void(const QString &results)> &callback)
+{
+    if (tools.isEmpty()) {
+        callback(results);
+        return;
+    }
+    const QString tool = tools.first();
+    callServerTool(tool, {}, this, [this, tool, tools, results, callback](const QJsonObject &result) {
+        // Text contents: summary and serialized structured content
+        QStringList texts;
+        const QJsonArray content = result.value("content"_L1).toArray();
+        for (const QJsonValue &value : content) {
+            texts.append(value.toObject().value("text"_L1).toString());
+        }
+        collectToolResults(tools.mid(1), results + u"### %1\n%2\n"_s.arg(tool, texts.join(u'\n')), callback);
+    });
+}
+
+QString Assistant::QuickDiagnostic(const QString &scenario)
+{
+    restartIdleTimer();
+    if (!calledFromDBus()) {
+        return {};
+    }
+    setDelayedReply(true);
+    mTroubleshooterClient->whenReady(this, [this, scenario, request = message(), bus = connection()](const QString &error) {
+        if (!error.isEmpty()) {
+            bus.send(request.createErrorReply(QDBusError::Failed, error));
+            return;
+        }
+        const QStringList tools = diagnosticTools(scenario);
+        if (tools.isEmpty()) {
+            bus.send(request.createErrorReply(QDBusError::InvalidArgs, u"Unknown scenario: %1"_s.arg(scenario)));
+            return;
+        }
+        runQuickDiagnostic(tools, {}, [request, bus](const QString &markdown) {
+            bus.send(request.createReply(markdown));
+        });
+    });
+    return {};
+}
+
+void Assistant::runQuickDiagnostic(const QStringList &tools, const QString &markdown, const std::function<void(const QString &markdown)> &callback)
+{
+    if (tools.isEmpty()) {
+        callback(markdown);
+        return;
+    }
+    const QString tool = tools.first();
+    // One tool after another: results are shown in order of scenario
+    callServerTool(tool, {}, this, [this, tool, tools, markdown, callback](const QJsonObject &result) {
+        const QJsonArray content = result.value("content"_L1).toArray();
+        const QString summary = content.isEmpty() ? QString() : content.first().toObject().value("text"_L1).toString();
+        const QString line = result.value("isError"_L1).toBool() ? i18n("- **%1**: not available (%2)", toolTitle(tool), summary)
+                                                                 : i18n("- **%1**: %2", toolTitle(tool), summary);
+        runQuickDiagnostic(tools.mid(1), markdown + line + u'\n', callback);
+    });
+}
+
+QString Assistant::toolTitle(const QString &name) const
+{
+    const QJsonArray tools = mTroubleshooterClient->tools();
+    for (const QJsonValue &value : tools) {
+        const QJsonObject tool = value.toObject();
+        if (tool.value("name"_L1).toString() == name) {
+            return tool.value("title"_L1).toString(name);
+        }
+    }
+    return name;
+}
+
 QString Assistant::UndoChange(const QString &changeId)
 {
     restartIdleTimer();

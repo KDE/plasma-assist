@@ -58,6 +58,9 @@ public:
     // \a client: D-Bus client which sent message, only it can confirm actions of answer.
     // Returns error when conversation is unknown or busy.
     [[nodiscard]] QString sendMessage(const QByteArray &conversation, const QString &text, const QString &client = {});
+    // Sends prompt of a scenario: names of tools in \a text are replaced by names known by language model
+    // (errorOccurred() is emitted on error)
+    void sendScenario(const QByteArray &conversation, const QString &text, const QString &client);
     bool cancel(const QByteArray &conversation);
     [[nodiscard]] bool hasConversationInProgress() const;
 

@@ -63,6 +63,22 @@
       <arg name="changeId" type="s" direction="in"/>
       <arg type="s" direction="out"/>
     </method>
+    <!-- JSON array of guided scenarios (prompts of server): name, title, description, icon, diagnosticTools -->
+    <method name="ListScenarios">
+      <arg type="s" direction="out"/>
+    </method>
+    <!-- Sends scenario to language model in conversation. details: description of user (can be empty).
+         Answer is sent like SendMessage -->
+    <method name="StartScenario">
+      <arg name="conversation" type="s" direction="in"/>
+      <arg name="scenario" type="s" direction="in"/>
+      <arg name="details" type="s" direction="in"/>
+    </method>
+    <!-- Runs diagnostic tools of scenario without language model. Returns summaries (Markdown list) -->
+    <method name="QuickDiagnostic">
+      <arg name="scenario" type="s" direction="in"/>
+      <arg type="s" direction="out"/>
+    </method>
     <signal name="StatusChanged">
       <arg name="status" type="s" direction="out"/>
     </signal>

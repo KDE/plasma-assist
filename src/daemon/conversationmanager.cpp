@@ -297,6 +297,19 @@ QJsonArray ConversationManager::messages(const QByteArray &conversation)
     return result;
 }
 
+void ConversationManager::sendScenario(const QByteArray &conversation, const QString &text, const QString &client)
+{
+    ensureManager();
+    TextAutoGenerateMcpToolsManager *toolsManager = mManager->textAutoGenerateMcpToolsManager();
+    // Tools of server must be loaded to know their exposed names ("server__tool")
+    toolsManager->prepareServers({TroubleshooterClient::serverIdentifier()}, this, [this, toolsManager, conversation, text, client]() {
+        const QString prompt = toolsManager->replaceToolNames(TroubleshooterClient::serverIdentifier(), text);
+        if (const QString error = sendMessage(conversation, prompt, client); !error.isEmpty()) {
+            Q_EMIT errorOccurred(conversation, error);
+        }
+    });
+}
+
 void ConversationManager::setConfirmationManager(ConfirmationManager *confirmationManager)
 {
     mConfirmationManager = confirmationManager;
