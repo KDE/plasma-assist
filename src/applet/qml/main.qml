@@ -17,7 +17,15 @@ PlasmoidItem {
 
     Plasmoid.icon: "help-browser"
     // Hidden in system tray until a conversation is in progress
-    Plasmoid.status: Plasmoid.answerInProgress ? PlasmaCore.Types.ActiveStatus : PlasmaCore.Types.PassiveStatus
+    Plasmoid.status: {
+        if (Plasmoid.confirmationPending) {
+            return PlasmaCore.Types.RequiresAttentionStatus;
+        }
+        return Plasmoid.answerInProgress ? PlasmaCore.Types.ActiveStatus : PlasmaCore.Types.PassiveStatus;
+    }
+
+    // Changes page is shown on home page
+    property bool showChanges: false
 
     toolTipMainText: i18n("Plasma Assist")
     toolTipSubText: Plasmoid.answerInProgress ? i18n("Assistant is answering…") : i18n("Diagnose and fix common problems")
@@ -38,12 +46,26 @@ PlasmoidItem {
 
         Loader {
             anchors.fill: parent
-            sourceComponent: Plasmoid.conversationOpen ? conversationPage : homePage
+            sourceComponent: {
+                if (Plasmoid.conversationOpen) {
+                    return conversationPage;
+                }
+                return root.showChanges ? changesPage : homePage;
+            }
         }
 
         Component {
             id: homePage
-            HomePage {}
+            HomePage {
+                onChangesRequested: root.showChanges = true
+            }
+        }
+
+        Component {
+            id: changesPage
+            ChangesPage {
+                onCloseRequested: root.showChanges = false
+            }
         }
 
         Component {

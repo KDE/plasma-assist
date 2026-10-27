@@ -16,18 +16,33 @@ import org.kde.kirigami as Kirigami
 PlasmaComponents3.ScrollView {
     id: page
 
+    signal changesRequested()
+
     contentWidth: availableWidth
 
     ColumnLayout {
         width: page.availableWidth
         spacing: Kirigami.Units.largeSpacing
 
-        Kirigami.Heading {
+        RowLayout {
             Layout.fillWidth: true
             Layout.margins: Kirigami.Units.largeSpacing
-            level: 2
-            text: i18n("What is the problem?")
-            wrapMode: Text.WordWrap
+
+            Kirigami.Heading {
+                Layout.fillWidth: true
+                level: 2
+                text: i18n("What is the problem?")
+                wrapMode: Text.WordWrap
+            }
+
+            PlasmaComponents3.ToolButton {
+                icon.name: "view-history"
+                text: i18nc("@action:button", "Changes")
+                display: PlasmaComponents3.AbstractButton.IconOnly
+                PlasmaComponents3.ToolTip.text: i18n("Changes made by assistant")
+                PlasmaComponents3.ToolTip.visible: hovered
+                onClicked: page.changesRequested()
+            }
         }
 
         Kirigami.InlineMessage {
@@ -63,6 +78,15 @@ PlasmaComponents3.ScrollView {
                     onClicked: Plasmoid.sendMessage(prompt)
                 }
             }
+        }
+
+        PlasmaComponents3.Switch {
+            Layout.fillWidth: true
+            Layout.leftMargin: Kirigami.Units.largeSpacing
+            Layout.rightMargin: Kirigami.Units.largeSpacing
+            text: i18n("Allow assistant to change settings (after confirmation)")
+            checked: Plasmoid.actionsAllowed
+            onToggled: Plasmoid.setActionsAllowed(checked)
         }
 
         PlasmaComponents3.TextField {

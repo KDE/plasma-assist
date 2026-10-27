@@ -14,15 +14,20 @@ class ConversationModel : public QAbstractListModel
     Q_OBJECT
 public:
     enum Roles {
-        // "user", "assistant", "tool" or "error"
+        // "user", "assistant", "tool", "confirmation", "notice" or "error"
         TypeRole = Qt::UserRole + 1,
         // Markdown for assistant
         TextRole,
         // Tool calls: name, "running", "done" or "failed", raw JSON
+        // Confirmations: "pending", "allowed" or "denied"
         ToolNameRole,
         StatusRole,
         ArgumentsRole,
         ResultRole,
+        // Identifier of confirmation request
+        IdentifierRole,
+        // Confirmations: "modify" or "destructive"
+        RiskRole,
     };
     Q_ENUM(Roles)
 
@@ -42,6 +47,11 @@ public:
     void startToolCall(const QString &callId, const QString &toolName, const QString &arguments);
     void finishToolCall(const QString &callId, const QString &result, bool isError);
     void addError(const QString &text);
+    void addNotice(const QString &text);
+    // \a summary is shown as text
+    void addConfirmation(const QString &requestId, const QString &toolName, const QString &summary, const QString &arguments, const QString &risk);
+    void finishConfirmation(const QString &requestId, bool allowed);
+    [[nodiscard]] bool hasPendingConfirmation() const;
 
 private:
     struct Item {
@@ -52,6 +62,7 @@ private:
         QString status;
         QString arguments;
         QString result;
+        QString risk;
     };
     void append(const Item &item);
     [[nodiscard]] qsizetype indexOf(const QString &type, const QString &identifier) const;

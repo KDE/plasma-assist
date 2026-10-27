@@ -35,6 +35,8 @@ plasma_add_applet(org.kde.plasma.assist
         qml/HomePage.qml
         qml/ConversationPage.qml
         qml/ToolCallCard.qml
+        qml/ConfirmationCard.qml
+        qml/ChangesPage.qml
     CPP_SOURCES
         assistapplet.h
         assistapplet.cpp

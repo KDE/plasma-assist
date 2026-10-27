@@ -21,4 +21,5 @@ private Q_SLOTS:
     void shouldShowAnswerAfterToolCalls();
     void shouldFinishToolCall();
     void shouldAddError();
+    void shouldFollowConfirmation();
 };

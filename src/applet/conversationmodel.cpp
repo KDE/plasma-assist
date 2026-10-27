@@ -17,6 +17,8 @@ constexpr QLatin1StringView userType{"user"};
 constexpr QLatin1StringView assistantType{"assistant"};
 constexpr QLatin1StringView toolType{"tool"};
 constexpr QLatin1StringView errorType{"error"};
+constexpr QLatin1StringView noticeType{"notice"};
+constexpr QLatin1StringView confirmationType{"confirmation"};
 
 QString toJson(const QJsonValue &value)
 {
@@ -62,6 +64,10 @@ QVariant ConversationModel::data(const QModelIndex &index, int role) const
         return item.arguments;
     case ResultRole:
         return item.result;
+    case IdentifierRole:
+        return item.identifier;
+    case RiskRole:
+        return item.risk;
     default:
         return {};
     }
@@ -76,6 +82,8 @@ QHash<int, QByteArray> ConversationModel::roleNames() const
         {StatusRole, "status"_ba},
         {ArgumentsRole, "arguments"_ba},
         {ResultRole, "result"_ba},
+        {IdentifierRole, "identifier"_ba},
+        {RiskRole, "risk"_ba},
     };
 }
 
@@ -104,6 +112,7 @@ void ConversationModel::setMessages(const QString &json)
                 .status = u"done"_s,
                 .arguments = toJson(call.value("arguments"_L1)),
                 .result = call.value("result"_L1).toString(),
+                .risk = {},
             });
         }
         if (const QString text = message.value("text"_L1).toString(); !text.isEmpty()) {
@@ -115,6 +124,7 @@ void ConversationModel::setMessages(const QString &json)
                 .status = {},
                 .arguments = {},
                 .result = {},
+                .risk = {},
             });
         }
     }
@@ -125,7 +135,7 @@ void ConversationModel::setMessages(const QString &json)
 
 void ConversationModel::addUserMessage(const QString &text)
 {
-    append({.type = userType, .identifier = {}, .text = text, .toolName = {}, .status = {}, .arguments = {}, .result = {}});
+    append({.type = userType, .identifier = {}, .text = text, .toolName = {}, .status = {}, .arguments = {}, .result = {}, .risk = {}});
 }
 
 void ConversationModel::setAnswer(const QString &messageId, const QString &text)
@@ -143,12 +153,13 @@ void ConversationModel::setAnswer(const QString &messageId, const QString &text)
         mItems.removeAt(row);
         endRemoveRows();
     }
-    append({.type = assistantType, .identifier = messageId, .text = text, .toolName = {}, .status = {}, .arguments = {}, .result = {}});
+    append({.type = assistantType, .identifier = messageId, .text = text, .toolName = {}, .status = {}, .arguments = {}, .result = {}, .risk = {}});
 }
 
 void ConversationModel::startToolCall(const QString &callId, const QString &toolName, const QString &arguments)
 {
-    append({.type = toolType, .identifier = callId, .text = {}, .toolName = toolName, .status = u"running"_s, .arguments = arguments, .result = {}});
+    append(
+        {.type = toolType, .identifier = callId, .text = {}, .toolName = toolName, .status = u"running"_s, .arguments = arguments, .result = {}, .risk = {}});
 }
 
 void ConversationModel::finishToolCall(const QString &callId, const QString &result, bool isError)
@@ -165,7 +176,46 @@ void ConversationModel::finishToolCall(const QString &callId, const QString &res
 
 void ConversationModel::addError(const QString &text)
 {
-    append({.type = errorType, .identifier = {}, .text = text, .toolName = {}, .status = {}, .arguments = {}, .result = {}});
+    append({.type = errorType, .identifier = {}, .text = text, .toolName = {}, .status = {}, .arguments = {}, .result = {}, .risk = {}});
+}
+
+void ConversationModel::addNotice(const QString &text)
+{
+    append({.type = noticeType, .identifier = {}, .text = text, .toolName = {}, .status = {}, .arguments = {}, .result = {}, .risk = {}});
+}
+
+void ConversationModel::addConfirmation(const QString &requestId,
+                                        const QString &toolName,
+                                        const QString &summary,
+                                        const QString &arguments,
+                                        const QString &risk)
+{
+    append({.type = confirmationType,
+            .identifier = requestId,
+            .text = summary,
+            .toolName = toolName,
+            .status = u"pending"_s,
+            .arguments = arguments,
+            .result = {},
+            .risk = risk});
+}
+
+void ConversationModel::finishConfirmation(const QString &requestId, bool allowed)
+{
+    const qsizetype row = indexOf(confirmationType, requestId);
+    if (row < 0) {
+        return;
+    }
+    mItems[row].status = allowed ? u"allowed"_s : u"denied"_s;
+    const QModelIndex index = createIndex(row, 0);
+    Q_EMIT dataChanged(index, index, {StatusRole});
+}
+
+bool ConversationModel::hasPendingConfirmation() const
+{
+    return std::ranges::any_of(mItems, [](const Item &item) {
+        return item.type == confirmationType && item.status == "pending"_L1;
+    });
 }
 
 void ConversationModel::append(const Item &item)

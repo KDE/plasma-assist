@@ -75,6 +75,8 @@ ColumnLayout {
                 required property string status
                 required property string arguments
                 required property string result
+                required property string identifier
+                required property string risk
 
                 width: ListView.view.width - Kirigami.Units.largeSpacing * 2
                 x: Kirigami.Units.largeSpacing
@@ -92,6 +94,10 @@ ColumnLayout {
                             return toolCall;
                         case "error":
                             return errorMessage;
+                        case "notice":
+                            return noticeMessage;
+                        case "confirmation":
+                            return confirmation;
                         default:
                             return assistantMessage;
                         }
@@ -147,6 +153,27 @@ ColumnLayout {
                         status: delegateItem.status
                         arguments: delegateItem.arguments
                         result: delegateItem.result
+                    }
+                }
+
+                Component {
+                    id: noticeMessage
+
+                    Kirigami.InlineMessage {
+                        type: Kirigami.MessageType.Information
+                        text: delegateItem.text
+                        visible: true
+                    }
+                }
+
+                Component {
+                    id: confirmation
+
+                    ConfirmationCard {
+                        requestId: delegateItem.identifier
+                        summary: delegateItem.text
+                        status: delegateItem.status
+                        risk: delegateItem.risk
                     }
                 }
 

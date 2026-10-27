@@ -105,4 +105,25 @@ void ConversationModelTest::shouldAddError()
     QCOMPARE(model.index(0).data(Qt::DisplayRole).toString(), u"No language model is configured."_s);
 }
 
+void ConversationModelTest::shouldFollowConfirmation()
+{
+    ConversationModel model;
+    QVERIFY(!model.hasPendingConfirmation());
+    model.addConfirmation(u"request"_s, u"set_audio_mute"_s, u"Mute Speakers"_s, u"{}"_s, u"modify"_s);
+    model.addNotice(u"Actions are disabled"_s);
+    QCOMPARE(types(model), (QStringList{u"confirmation"_s, u"notice"_s}));
+    const QModelIndex index = model.index(0);
+    QCOMPARE(index.data(ConversationModel::IdentifierRole).toString(), u"request"_s);
+    QCOMPARE(index.data(ConversationModel::TextRole).toString(), u"Mute Speakers"_s);
+    QCOMPARE(index.data(ConversationModel::StatusRole).toString(), u"pending"_s);
+    QCOMPARE(index.data(ConversationModel::RiskRole).toString(), u"modify"_s);
+    QVERIFY(model.hasPendingConfirmation());
+
+    model.finishConfirmation(u"request"_s, false);
+    QCOMPARE(index.data(ConversationModel::StatusRole).toString(), u"denied"_s);
+    QVERIFY(!model.hasPendingConfirmation());
+    // Unknown request is ignored
+    model.finishConfirmation(u"unknown"_s, true);
+}
+
 #include "moc_conversationmodeltest.cpp"
