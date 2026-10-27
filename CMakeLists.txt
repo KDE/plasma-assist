@@ -132,6 +132,7 @@ find_package(
         Gui
         Network
         Quick
+        Widgets
 )
 find_package(
     KF6
@@ -142,6 +143,7 @@ find_package(
         CoreAddons
         I18n
         NetworkManagerQt
+        Notifications
         Solid
 )
 

@@ -49,6 +49,7 @@ public:
     void SetActionsAllowed(bool allowed);
     QString ListChanges();
     QString ListScenarios();
+    void ShowConfigureDialog();
     void StartScenario(const QString &conversation, const QString &scenario, const QString &details);
     QString QuickDiagnostic(const QString &scenario);
     QString UndoChange(const QString &changeId);

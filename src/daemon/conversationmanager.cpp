@@ -20,6 +20,7 @@
 #include <TextAutoGenerateText/TextAutoGenerateManager>
 #include <TextAutoGenerateText/TextAutoGenerateMcpToolsManager>
 #include <TextAutoGenerateText/TextAutoGenerateMessagesModel>
+#include <TextAutoGenerateText/TextAutoGenerateTextInstancesManagerDialog>
 #include <TextAutoGenerateText/TextAutoGenerateTextPlugin>
 #include <TextAutoGenerateTextMcpProtocolCore/McpServerManager>
 #include <TextAutoGenerateTextMcpProtocolCore/McpServerModel>
@@ -153,6 +154,12 @@ void ConversationManager::ensureManager()
             });
         });
 
+    // Another language model can be selected: it's checked again (remote models are refused) before next message
+    connect(mManager, &TextAutoGenerateManager::configChanged, this, [this]() {
+        if (mEngineStatus != EngineStatus::Loading) {
+            setEngineStatus(EngineStatus::NotLoaded);
+        }
+    });
     connect(mManager, &TextAutoGenerateManager::chatInProgressStatusChanged, this, &ConversationManager::slotConversationInProgressChanged);
     connect(mManager, &TextAutoGenerateManager::errorOccurred, this, [this](QNetworkReply::NetworkError, const QString &error) {
         // Error is not associated to a conversation
@@ -223,6 +230,29 @@ void ConversationManager::setEngineStatus(EngineStatus status, const QString &er
     if (changed) {
         Q_EMIT engineStatusChanged();
     }
+}
+
+void ConversationManager::showConfigureDialog()
+{
+    ensureManager();
+    if (!mConfigureDialog) {
+        mConfigureDialog = new TextAutoGenerateTextInstancesManagerDialog(mManager);
+        mConfigureDialog->setAttribute(Qt::WA_DeleteOnClose);
+        connect(mConfigureDialog, &QDialog::accepted, this, [this]() {
+            // Instances were saved: they are loaded again (and checked) for next message
+            if (mEngineStatus != EngineStatus::Loading) {
+                setEngineStatus(EngineStatus::NotLoaded);
+            }
+        });
+    }
+    mConfigureDialog->show();
+    mConfigureDialog->raise();
+    mConfigureDialog->activateWindow();
+}
+
+bool ConversationManager::isConfigureDialogVisible() const
+{
+    return mConfigureDialog && mConfigureDialog->isVisible();
 }
 
 QByteArray ConversationManager::newConversation()
@@ -348,6 +378,13 @@ QString ConversationManager::sendMessage(const QByteArray &conversation, const Q
 
 void ConversationManager::send(const PendingMessage &message)
 {
+    // Current language model can be changed in configuration dialog without loading engine again
+    if (const QString error = engineError(); !error.isEmpty()) {
+        mConversationsInProgress.remove(message.conversation);
+        setEngineStatus(EngineStatus::Error, error);
+        Q_EMIT errorOccurred(message.conversation, error);
+        return;
+    }
     TextAutoGenerateTextPlugin *plugin = mManager->textAutoGeneratePlugin();
     setTitleIfEmpty(message.conversation, message.text);
     plugin->sendMessage(TextAutoGenerateTextPlugin::EditSendInfo{

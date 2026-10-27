@@ -5,9 +5,11 @@
 */
 #pragma once
 
+#include <QDialog>
 #include <QHash>
 #include <QJsonArray>
 #include <QObject>
+#include <QPointer>
 #include <QSet>
 #include <QTimer>
 
@@ -67,6 +69,10 @@ public:
     // Asks user to confirm tools which change system (they are refused without it)
     void setConfirmationManager(ConfirmationManager *confirmationManager);
 
+    // Opens dialog of ktextaddons to choose language model
+    void showConfigureDialog();
+    [[nodiscard]] bool isConfigureDialogVisible() const;
+
     // Language models which send data to a remote server are refused unless allowed in plasma-assistrc
     [[nodiscard]] static bool remoteLanguageModelAllowed();
 
@@ -100,6 +106,7 @@ private:
     [[nodiscard]] TextAutoGenerateText::TextAutoGenerateMessagesModel *messagesModel(const QByteArray &conversation);
 
     TextAutoGenerateText::TextAutoGenerateManager *mManager = nullptr;
+    QPointer<QDialog> mConfigureDialog;
     QTimer mEngineTimer;
     QList<PendingMessage> mPendingMessages;
     QSet<QByteArray> mWatchedConversations;

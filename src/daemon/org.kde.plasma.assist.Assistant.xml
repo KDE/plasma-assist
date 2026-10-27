@@ -63,6 +63,8 @@
       <arg name="changeId" type="s" direction="in"/>
       <arg type="s" direction="out"/>
     </method>
+    <!-- Opens dialog of ktextaddons to choose language model (provider and model) -->
+    <method name="ShowConfigureDialog"/>
     <!-- JSON array of guided scenarios (prompts of server): name, title, description, icon, diagnosticTools -->
     <method name="ListScenarios">
       <arg type="s" direction="out"/>

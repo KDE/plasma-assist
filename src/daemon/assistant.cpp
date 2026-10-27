@@ -324,6 +324,12 @@ QString Assistant::ListChanges()
     return {};
 }
 
+void Assistant::ShowConfigureDialog()
+{
+    restartIdleTimer();
+    mConversationManager->showConfigureDialog();
+}
+
 QString Assistant::ListScenarios()
 {
     restartIdleTimer();
@@ -508,7 +514,8 @@ void Assistant::restartIdleTimer()
 
 void Assistant::slotIdleTimeout()
 {
-    if (mTroubleshooterClient->hasPendingRequest() || mConversationManager->hasConversationInProgress() || mConfirmationManager->hasPendingRequest()) {
+    if (mTroubleshooterClient->hasPendingRequest() || mConversationManager->hasConversationInProgress() || mConfirmationManager->hasPendingRequest()
+        || mConversationManager->isConfigureDialogVisible()) {
         restartIdleTimer();
         return;
     }

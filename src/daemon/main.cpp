@@ -8,13 +8,16 @@
 #include "config-plasma-assist.h"
 #include <KAboutData>
 #include <KLocalizedString>
+#include <QApplication>
 #include <QCommandLineParser>
-#include <QCoreApplication>
 
 using namespace Qt::Literals::StringLiterals;
 int main(int argc, char *argv[])
 {
-    QCoreApplication app(argc, argv);
+    // Widgets: configuration dialog of language model
+    QApplication app(argc, argv);
+    // Daemon has no main window: closing configuration dialog must not quit it
+    app.setQuitOnLastWindowClosed(false);
 
     KLocalizedString::setApplicationDomain("plasma_assist"_ba);
 
@@ -38,6 +41,6 @@ int main(int argc, char *argv[])
         return 1;
     }
     // Started again by D-Bus activation when needed
-    QObject::connect(&assistant, &Assistant::idleTimeout, &app, &QCoreApplication::quit);
+    QObject::connect(&assistant, &Assistant::idleTimeout, &app, &QApplication::quit);
     return app.exec();
 }
