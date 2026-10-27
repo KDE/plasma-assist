@@ -34,7 +34,7 @@
 
 <legalnotice>&FDLNotice;</legalnotice>
 
-<date>2026-10-22</date>
+<date>2026-10-27</date>
 <releaseinfo>0.1.0</releaseinfo>
 
 <abstract>
@@ -72,6 +72,122 @@ sleep or crashing applications.
 <para>
 Diagnostic tools are read only. Every action which changes the system needs an explicit
 confirmation and can be undone.
+</para>
+</chapter>
+
+<chapter id="using">
+<title>Using &kappname;</title>
+
+<sect1 id="adding-applet">
+<title>Adding the Applet</title>
+<para>
+Add the <guilabel>Plasma Assist</guilabel> widget to a panel or to the system tray. It stays
+hidden in the system tray until it is used, and it is shown while the assistant answers or
+needs a confirmation. A global shortcut can be assigned in the <guilabel>Keyboard Shortcuts</guilabel>
+page of the applet settings.
+</para>
+</sect1>
+
+<sect1 id="scenarios">
+<title>Guided Scenarios</title>
+<para>
+The home page lists common problems: <guilabel>No Sound</guilabel>, <guilabel>External Screen</guilabel>,
+<guilabel>Internet or Wi-Fi</guilabel>, <guilabel>Computer Does Not Sleep</guilabel>,
+<guilabel>Application Crashes</guilabel> and <guilabel>System Report</guilabel>. Click one of them to
+start a conversation: the assistant first runs the diagnostic tools of the scenario, then explains
+the cause and proposes a fix.
+</para>
+<para>
+You can also describe your problem in the text field. Previous conversations are listed below it.
+</para>
+</sect1>
+
+<sect1 id="conversation">
+<title>Conversation</title>
+<para>
+Answers are written while they are generated. Each tool called by the assistant is shown as a card:
+click it to see its arguments and its result. Use <guibutton>Stop</guibutton> to interrupt an answer,
+and the back button to return to the home page (the answer continues in the background).
+</para>
+</sect1>
+
+<sect1 id="quick-diagnostic">
+<title>Without Language Model</title>
+<para>
+When no language model can be used, a scenario still runs its diagnostic tools and shows a summary
+of their results, with the obvious problems they found (muted output, Wi-Fi disabled, low battery…).
+Use <guibutton>Configure Language Model…</guibutton> on the home page to choose a provider and a model.
+</para>
+</sect1>
+</chapter>
+
+<chapter id="actions">
+<title>Actions and Confirmations</title>
+<para>
+The assistant can change some settings: default audio device, volume, audio card profile, output of
+an application, Wi-Fi, network connection, power profile, or restart the &plasma; shell.
+Actions are disabled by default: enable <guilabel>Allow assistant to change settings</guilabel>
+on the home page.
+</para>
+<para>
+Every action is shown with a confirmation card before it is done. The description of the action is
+built from its real arguments, not written by the language model. Choose <guibutton>Allow</guibutton>,
+<guibutton>Deny</guibutton>, or <guibutton>Always Allow</guibutton> to not be asked again for this kind of
+change (this choice is not proposed for actions which can't be undone, like restarting the &plasma; shell).
+Without an answer after two minutes, the action is denied. When the applet is closed, a notification
+lets you open it or deny the action.
+</para>
+
+<sect1 id="changes">
+<title>History of Changes</title>
+<para>
+The history button of the home page lists the changes made by the assistant. Click
+<guibutton>Undo</guibutton> to restore the previous state. Undo is refused when the setting was
+changed again since, to not overwrite your own change.
+</para>
+</sect1>
+</chapter>
+
+<chapter id="privacy">
+<title>Privacy</title>
+<para>
+Before results of tools are given to the language model, personal data are replaced by pseudonyms:
+<acronym>MAC</acronym> and <acronym>IP</acronym> addresses, names of Wi-Fi and <acronym>VPN</acronym>
+networks, user name, host name, and the path of your home folder. Passwords and keys of network
+connections are never read.
+</para>
+<para>
+Language models which send data to a remote server are refused by default: use a local model, for
+example with <ulink url="https://ollama.com">Ollama</ulink>.
+</para>
+</chapter>
+
+<chapter id="configuration">
+<title>Configuration</title>
+<para>
+The language model is chosen in the dialog of the text generation framework, shared with other
+&kde; applications. Other settings are saved in <filename>~/.config/plasma-assistrc</filename>:
+</para>
+<variablelist>
+<varlistentry>
+<term><literal>[General] AllowActions</literal></term>
+<listitem><para>Allow the assistant to change settings, after a confirmation (default: false).</para></listitem>
+</varlistentry>
+<varlistentry>
+<term><literal>[General] AllowRemoteLanguageModel</literal></term>
+<listitem><para>Allow language models which send data to a remote server (default: false).</para></listitem>
+</varlistentry>
+<varlistentry>
+<term><literal>[Privacy] FilterPersonalData</literal></term>
+<listitem><para>Mask personal data in results of tools (default: true).</para></listitem>
+</varlistentry>
+<varlistentry>
+<term><literal>[Confirmation] AlwaysAllowedTools</literal></term>
+<listitem><para>Actions which are not confirmed anymore (<guibutton>Always Allow</guibutton>).</para></listitem>
+</varlistentry>
+</variablelist>
+<para>
+Changes are saved in <filename>~/.local/state/plasma-assist/changes.json</filename> (50 last changes).
 </para>
 </chapter>
 
