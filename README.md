@@ -27,7 +27,7 @@ Linux only for the moment.
 - KDE Frameworks >= 6.30 (Config, CoreAddons, I18n, NetworkManagerQt,
  Notifications, Solid, DocTools optional)
 - Plasma >= 6.5 (libplasma, libkscreen), PulseAudioQt >= 1.6
-- ktextaddons >= 2.2.55 (`KF6TextAutoGenerateText`,
+- ktextaddons >= 2.2.57 (`KF6TextAutoGenerateText`,
  `KF6TextAutoGenerateTextMcpProtocolCore`)
 
 ## Build
