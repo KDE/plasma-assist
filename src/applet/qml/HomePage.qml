@@ -45,13 +45,27 @@ PlasmaComponents3.ScrollView {
             }
         }
 
+        // Quick diagnostic of scenarios still works without language model
         Kirigami.InlineMessage {
             Layout.fillWidth: true
             Layout.leftMargin: Kirigami.Units.largeSpacing
             Layout.rightMargin: Kirigami.Units.largeSpacing
             type: Kirigami.MessageType.Warning
-            text: Plasmoid.languageModelError
-            visible: text.length > 0
+            text: i18n("%1\nScenarios still run a quick diagnostic without assistant. A local model can be installed with Ollama.",
+                       Plasmoid.languageModelError)
+            visible: Plasmoid.languageModelError.length > 0
+            actions: [
+                Kirigami.Action {
+                    icon.name: "configure"
+                    text: i18nc("@action:button", "Configure Language Model…")
+                    onTriggered: Plasmoid.showConfigureDialog()
+                },
+                Kirigami.Action {
+                    icon.name: "internet-services"
+                    text: i18nc("@action:button", "Ollama Website")
+                    onTriggered: Qt.openUrlExternally("https://ollama.com")
+                }
+            ]
         }
 
         GridLayout {
@@ -99,6 +113,8 @@ PlasmaComponents3.ScrollView {
             Layout.leftMargin: Kirigami.Units.largeSpacing
             Layout.rightMargin: Kirigami.Units.largeSpacing
             placeholderText: i18n("Describe your problem…")
+            // Keyboard users can type directly when popup is opened
+            Component.onCompleted: forceActiveFocus()
             Accessible.name: i18n("Describe your problem")
             onAccepted: {
                 Plasmoid.sendMessage(text);

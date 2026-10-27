@@ -59,7 +59,10 @@ target_link_libraries(
         Plasma::Plasma
         KF6::CoreAddons
         KF6::I18n
+        KF6::Notifications
 )
+
+install(FILES plasma_assist.notifyrc DESTINATION ${KDE_INSTALL_KNOTIFYRCDIR})
 
 if(BUILD_TESTING)
     add_subdirectory(autotests)

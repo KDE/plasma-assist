@@ -7,9 +7,12 @@
 
 #include <Plasma/Applet>
 #include <QAbstractListModel>
+#include <QHash>
+#include <QPointer>
 #include <functional>
 
 class ConversationModel;
+class KNotification;
 class OrgKdePlasmaAssistAssistantInterface;
 class QDBusServiceWatcher;
 class ScenarioModel;
@@ -38,6 +41,8 @@ class AssistApplet : public Plasma::Applet
     Q_PROPERTY(QVariantList changes READ changes NOTIFY changesChanged)
     // Error of last undo
     Q_PROPERTY(QString changesError READ changesError NOTIFY changesChanged)
+    // Popup of applet is shown (set by QML): confirmations are notified when it's closed
+    Q_PROPERTY(bool popupOpen READ popupOpen WRITE setPopupOpen NOTIFY popupOpenChanged)
 public:
     AssistApplet(QObject *parent, const KPluginMetaData &data, const QVariantList &args);
     ~AssistApplet() override;
@@ -55,6 +60,8 @@ public:
     [[nodiscard]] bool confirmationPending() const;
     [[nodiscard]] QVariantList changes() const;
     [[nodiscard]] QString changesError() const;
+    [[nodiscard]] bool popupOpen() const;
+    void setPopupOpen(bool open);
 
     // Starts daemon by D-Bus activation
     Q_INVOKABLE void startDaemon();
@@ -72,6 +79,8 @@ public:
     Q_INVOKABLE void setActionsAllowed(bool allowed);
     Q_INVOKABLE void refreshChanges();
     Q_INVOKABLE void undoChange(const QString &changeId);
+    // Dialog of ktextaddons to choose language model (shown by daemon)
+    Q_INVOKABLE void showConfigureDialog();
 
 Q_SIGNALS:
     void daemonAvailableChanged();
@@ -81,6 +90,7 @@ Q_SIGNALS:
     void recentConversationsChanged();
     void confirmationPendingChanged();
     void changesChanged();
+    void popupOpenChanged();
 
 private:
     void setDaemonAvailable(bool available);
@@ -95,6 +105,7 @@ private:
     void refreshScenarios();
     void showError(const QString &error);
     void updateConfirmationPending();
+    void notifyConfirmation(const QString &requestId, const QString &summary);
 
     OrgKdePlasmaAssistAssistantInterface *const mInterface;
     QDBusServiceWatcher *const mServiceWatcher;
@@ -111,4 +122,7 @@ private:
     bool mConversationOpen = false;
     bool mAnswerInProgress = false;
     bool mConfirmationPending = false;
+    bool mPopupOpen = false;
+    // Notifications of confirmations, by request
+    QHash<QString, QPointer<KNotification>> mNotifications;
 };

@@ -31,6 +31,7 @@ PlasmoidItem {
     toolTipSubText: Plasmoid.answerInProgress ? i18n("Assistant is answering…") : i18n("Diagnose and fix common problems")
 
     onExpandedChanged: {
+        Plasmoid.popupOpen = expanded;
         if (expanded && !Plasmoid.conversationOpen) {
             Plasmoid.refreshConversations();
         }

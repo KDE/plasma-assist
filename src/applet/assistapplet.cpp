@@ -10,6 +10,7 @@
 #include "plasmaassist_applet_debug.h"
 #include "scenariomodel.h"
 #include <KLocalizedString>
+#include <KNotification>
 #include <QDBusConnection>
 #include <QDBusConnectionInterface>
 #include <QDBusPendingCallWatcher>
@@ -98,9 +99,15 @@ AssistApplet::AssistApplet(QObject *parent, const KPluginMetaData &data, const Q
                 if (conversation == mConversationId) {
                     mConversationModel->addConfirmation(requestId, tool, summary, arguments, risk);
                     updateConfirmationPending();
+                    if (!mPopupOpen) {
+                        notifyConfirmation(requestId, summary);
+                    }
                 }
             });
     connect(mInterface, &OrgKdePlasmaAssistAssistantInterface::ConfirmationFinished, this, [this](const QString &requestId, bool allowed) {
+        if (const QPointer<KNotification> notification = mNotifications.take(requestId); notification) {
+            notification->close();
+        }
         mConversationModel->finishConfirmation(requestId, allowed);
         updateConfirmationPending();
     });
@@ -227,6 +234,54 @@ void AssistApplet::undoChange(const QString &changeId)
         // Daemon sends ChangesChanged: list is refreshed
         Q_EMIT changesChanged();
     });
+}
+
+bool AssistApplet::popupOpen() const
+{
+    return mPopupOpen;
+}
+
+void AssistApplet::setPopupOpen(bool open)
+{
+    if (mPopupOpen == open) {
+        return;
+    }
+    mPopupOpen = open;
+    Q_EMIT popupOpenChanged();
+    if (mPopupOpen) {
+        // Confirmation is shown in popup
+        const auto notifications = std::exchange(mNotifications, {});
+        for (const QPointer<KNotification> &notification : notifications) {
+            if (notification) {
+                notification->close();
+            }
+        }
+    }
+}
+
+void AssistApplet::showConfigureDialog()
+{
+    mInterface->ShowConfigureDialog();
+}
+
+void AssistApplet::notifyConfirmation(const QString &requestId, const QString &summary)
+{
+    auto notification = new KNotification(u"confirmationRequested"_s, KNotification::Persistent);
+    notification->setComponentName(u"plasma_assist"_s);
+    notification->setTitle(i18n("The assistant needs your confirmation"));
+    notification->setText(summary);
+    notification->setIconName(u"help-browser"_s);
+    KNotificationAction *openAction = notification->addAction(i18nc("@action:button", "Open"));
+    connect(openAction, &KNotificationAction::activated, this, [this]() {
+        // Popup is opened
+        Q_EMIT activated();
+    });
+    KNotificationAction *denyAction = notification->addAction(i18nc("@action:button", "Deny"));
+    connect(denyAction, &KNotificationAction::activated, this, [this, requestId]() {
+        confirm(requestId, 0);
+    });
+    mNotifications.insert(requestId, notification);
+    notification->sendEvent();
 }
 
 void AssistApplet::updateConfirmationPending()

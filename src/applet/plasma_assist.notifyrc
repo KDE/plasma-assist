@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 Laurent Montel <montel@kde.org>
+# SPDX-License-Identifier: CC0-1.0
+[Global]
+IconName=help-browser
+Name=Plasma Assist
+Comment=Assistant to diagnose and fix problems
+
+[Event/confirmationRequested]
+Name=Confirmation requested
+Comment=The assistant needs a confirmation to change the system
+Action=Popup
+Urgency=Critical

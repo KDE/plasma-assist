@@ -205,6 +205,11 @@ ColumnLayout {
         Layout.margins: Kirigami.Units.smallSpacing
         enabled: !Plasmoid.answerInProgress
         placeholderText: i18n("Answer…")
+        onEnabledChanged: {
+            if (enabled) {
+                forceActiveFocus();
+            }
+        }
         Accessible.name: i18n("Answer to assistant")
         onAccepted: {
             Plasmoid.sendMessage(text);

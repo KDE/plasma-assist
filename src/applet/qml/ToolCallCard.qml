@@ -37,7 +37,16 @@ ColumnLayout {
                 return card.toolName;
             }
         }
-        Accessible.name: text
+        Accessible.name: {
+            switch (card.status) {
+            case "running":
+                return i18nc("@info:accessible", "Tool %1, running", card.toolName);
+            case "failed":
+                return i18nc("@info:accessible", "Tool %1, failed", card.toolName);
+            default:
+                return i18nc("@info:accessible", "Tool %1, finished", card.toolName);
+            }
+        }
         Accessible.description: card.expanded ? i18n("Hide details of tool call") : i18n("Show details of tool call")
         onClicked: card.expanded = !card.expanded
 
