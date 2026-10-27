@@ -9,6 +9,7 @@ Dependencies:
     'frameworks/kdoctools': '@latest-kf6'
     'libraries/ktextaddons': '@latest-kf6'
     'plasma/libplasma': '@latest-kf6'
+    'plasma/libkscreen': '@same'
 
 Options:
  require-passing-tests-on: ['Linux']
