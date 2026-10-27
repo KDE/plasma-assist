@@ -96,6 +96,8 @@ private:
     void slotEngineLoaded();
     // Error which prevents to use current language model
     [[nodiscard]] QString engineError() const;
+    // Error when no model can be used (known when language model is initialized)
+    [[nodiscard]] QString modelError() const;
     void setEngineStatus(EngineStatus status, const QString &errorString = {});
     void send(const PendingMessage &message);
     void watchConversation(const QByteArray &conversation);

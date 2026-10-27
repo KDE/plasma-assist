@@ -196,11 +196,23 @@ QString ConversationManager::engineError() const
     return {};
 }
 
+QString ConversationManager::modelError() const
+{
+    const TextAutoGenerateTextPlugin *plugin = mManager->textAutoGeneratePlugin();
+    // Without selected model, ktextaddons uses first model which can answer messages
+    if (plugin && plugin->currentModel().isEmpty()) {
+        return i18n("No model is selected for language model \"%1\". Select one in its configuration.", plugin->displayName());
+    }
+    return {};
+}
+
 void ConversationManager::slotEngineLoaded()
 {
     mEngineTimer.stop();
     if (const QString error = engineError(); !error.isEmpty()) {
         setEngineStatus(EngineStatus::Error, error);
+    } else if (const QString noModelError = modelError(); !noModelError.isEmpty() && mManager->textAutoGeneratePlugin()->ready()) {
+        setEngineStatus(EngineStatus::Error, noModelError);
     } else if (!mManager->textAutoGeneratePlugin()->ready()) {
         setEngineStatus(EngineStatus::Error, i18n("Language model \"%1\" is not ready.", mManager->textAutoGeneratePlugin()->displayName()));
     } else {
@@ -379,7 +391,11 @@ QString ConversationManager::sendMessage(const QByteArray &conversation, const Q
 void ConversationManager::send(const PendingMessage &message)
 {
     // Current language model can be changed in configuration dialog without loading engine again
-    if (const QString error = engineError(); !error.isEmpty()) {
+    QString error = engineError();
+    if (error.isEmpty()) {
+        error = modelError();
+    }
+    if (!error.isEmpty()) {
         mConversationsInProgress.remove(message.conversation);
         setEngineStatus(EngineStatus::Error, error);
         Q_EMIT errorOccurred(message.conversation, error);
