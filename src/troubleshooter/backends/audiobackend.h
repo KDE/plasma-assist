@@ -73,12 +73,25 @@ class AudioBackend
 public:
     // Error is empty on success
     using StateCallback = std::function<void(const AudioState &state, const QString &error)>;
+    using ErrorCallback = std::function<void(const QString &error)>;
+    enum class DeviceKind : uint8_t {
+        Sink,
+        Source,
+    };
 
     AudioBackend();
     virtual ~AudioBackend();
 
     // Asynchronous (connection to audio server). Callback is not called when \a context is deleted
     virtual void fetchState(QObject *context, StateCallback callback) = 0;
+
+    // Changes are asynchronous: callback is called when request is sent, read state to know when it's applied
+    virtual void setDefaultDevice(DeviceKind kind, const QString &name, QObject *context, const ErrorCallback &callback) = 0;
+    virtual void setVolume(DeviceKind kind, const QString &name, int volumePercent, QObject *context, const ErrorCallback &callback) = 0;
+    virtual void setMuted(DeviceKind kind, const QString &name, bool muted, QObject *context, const ErrorCallback &callback) = 0;
+    virtual void setCardProfile(const QString &card, const QString &profile, QObject *context, const ErrorCallback &callback) = 0;
+    // Moves stream \a streamIndex of an application to sink \a sink
+    virtual void moveStream(quint32 streamIndex, const QString &sink, QObject *context, const ErrorCallback &callback) = 0;
 
 private:
     Q_DISABLE_COPY_MOVE(AudioBackend)

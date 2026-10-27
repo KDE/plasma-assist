@@ -55,8 +55,8 @@ LogModule::JournalArguments LogModule::journalArguments(const QMap<QString, QJso
     static const QRegularExpression sinceExpression(u"^(-?\\d+(s|min|h|d|w)|today|yesterday|\\d{4}-\\d{2}-\\d{2}( \\d{2}:\\d{2}(:\\d{2})?)?)$"_s);
 
     JournalArguments result;
-    result.limit = std::clamp(toolArguments.value(u"limit"_s).toInt(defaultLimit), 1, maximumLimit);
-    const bool system = toolArguments.value(u"system"_s).toBool(false);
+    result.limit = static_cast<int>(std::clamp<qint64>(ToolHelpers::integerArgument(toolArguments.value(u"limit"_s)).value_or(defaultLimit), 1, maximumLimit));
+    const bool system = ToolHelpers::booleanArgument(toolArguments.value(u"system"_s)).value_or(false);
     result.arguments = {u"-o"_s, u"json"_s, u"--no-pager"_s, u"-q"_s, u"-n"_s, QString::number(result.limit)};
     if (!system) {
         result.arguments.append(u"--user"_s);
@@ -153,7 +153,7 @@ void LogModule::registerTools(McpProtocolServerProtocolManager *manager, Command
                 ToolHelpers::finishWithError(call, arguments.error);
                 return;
             }
-            const bool system = call->arguments().value(u"system"_s).toBool(false);
+            const bool system = ToolHelpers::booleanArgument(call->arguments().value(u"system"_s)).value_or(false);
             runner->run(CommandRunner::Command::Journalctl, arguments.arguments, call, [call, system](const QByteArray &output, const QString &error) {
                 if (!error.isEmpty()) {
                     ToolHelpers::finishWithError(call, error);

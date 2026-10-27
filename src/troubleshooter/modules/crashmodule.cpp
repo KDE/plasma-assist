@@ -174,8 +174,10 @@ void CrashModule::registerTools(McpProtocolServerProtocolManager *manager, Comma
                              {u"description"_s, u"Maximum number of crashes (default %1, maximum %2)"_s.arg(defaultLimit).arg(maximumLimit)}}},
             }),
         [runner](McpProtocolServerToolCall *call) {
-            const int days = std::clamp(call->arguments().value(u"days"_s).toInt(defaultDays), 1, maximumDays);
-            const int limit = std::clamp(call->arguments().value(u"limit"_s).toInt(defaultLimit), 1, maximumLimit);
+            const int days =
+                static_cast<int>(std::clamp<qint64>(ToolHelpers::integerArgument(call->arguments().value(u"days"_s)).value_or(defaultDays), 1, maximumDays));
+            const int limit =
+                static_cast<int>(std::clamp<qint64>(ToolHelpers::integerArgument(call->arguments().value(u"limit"_s)).value_or(defaultLimit), 1, maximumLimit));
             runner->run(
                 CommandRunner::Command::Coredumpctl,
                 {u"--json=short"_s, u"--no-pager"_s, u"-q"_s, u"-r"_s, u"-n"_s, QString::number(maximumCountedCrashes), u"--since=-%1d"_s.arg(days), u"list"_s},
@@ -209,7 +211,7 @@ void CrashModule::registerTools(McpProtocolServerProtocolManager *manager, Comma
             {{u"pid"_s, QJsonObject{{u"type"_s, u"integer"_s}, {u"description"_s, u"Process id of the crash (pid of list_recent_crashes)"_s}}}},
             {u"pid"_s}),
         [runner](McpProtocolServerToolCall *call) {
-            const qint64 pid = call->arguments().value(u"pid"_s).toInteger(-1);
+            const qint64 pid = ToolHelpers::integerArgument(call->arguments().value(u"pid"_s)).value_or(-1);
             if (pid <= 0) {
                 ToolHelpers::finishWithError(call, u"Invalid pid"_s);
                 return;

@@ -24,6 +24,8 @@ public:
     void checkConnectivity(QObject *context, const ConnectivityCallback &callback) override;
     void resolveHost(const QString &host, QObject *context, const ResolveCallback &callback) override;
     void checkHttp(QObject *context, const HttpCallback &callback) override;
+    void setWirelessEnabled(bool enabled, QObject *context, const ErrorCallback &callback) override;
+    void reconnect(const QString &name, QObject *context, const ErrorCallback &callback) override;
 
 private:
     std::unique_ptr<QNetworkAccessManager> mNetworkAccessManager;

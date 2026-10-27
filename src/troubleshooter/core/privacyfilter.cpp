@@ -128,6 +128,55 @@ QString PrivacyFilter::originalValue(const QString &pseudonym) const
     return mOriginalValues.value(pseudonym);
 }
 
+QJsonValue PrivacyFilter::restore(const QJsonValue &value) const
+{
+    switch (value.type()) {
+    case QJsonValue::String: {
+        static const QRegularExpression pseudonymExpression(u"<(?:mac|ip|name)-\\d+>|<user>|<hostname>"_s);
+        QString text = value.toString();
+        QRegularExpressionMatchIterator it = pseudonymExpression.globalMatch(text);
+        // Replaced from the end: positions of previous matches don't change
+        QList<QRegularExpressionMatch> matches;
+        while (it.hasNext()) {
+            matches.prepend(it.next());
+        }
+        for (const QRegularExpressionMatch &match : std::as_const(matches)) {
+            QString original;
+            if (match.captured() == "<user>"_L1) {
+                original = mUserName;
+            } else if (match.captured() == "<hostname>"_L1) {
+                original = mHostName;
+            } else {
+                original = originalValue(match.captured());
+            }
+            // Unknown pseudonym is kept: action will report an unknown device
+            if (!original.isEmpty()) {
+                text.replace(match.capturedStart(), match.capturedLength(), original);
+            }
+        }
+        return text;
+    }
+    case QJsonValue::Array: {
+        QJsonArray array;
+        const QJsonArray values = value.toArray();
+        for (const QJsonValue &item : values) {
+            array.append(restore(item));
+        }
+        return array;
+    }
+    case QJsonValue::Object: {
+        QJsonObject object;
+        const QJsonObject values = value.toObject();
+        for (auto it = values.constBegin(); it != values.constEnd(); ++it) {
+            object.insert(it.key(), restore(it.value()));
+        }
+        return object;
+    }
+    default:
+        return value;
+    }
+}
+
 QString PrivacyFilter::filter(const QString &text)
 {
     if (!mEnabled || text.isEmpty()) {

@@ -11,6 +11,7 @@
 #include <QStringList>
 #include <TextAutoGenerateTextMcpProtocolCore/McpProtocolServerTool>
 #include <functional>
+#include <optional>
 
 namespace TextAutoGenerateTextMcpProtocolCore
 {
@@ -71,6 +72,11 @@ void callTool(TextAutoGenerateTextMcpProtocolCore::McpProtocolServerProtocolMana
               const QMap<QString, QJsonValue> &arguments,
               QObject *context,
               const std::function<void(const QJsonObject &result)> &callback);
+
+// Language models often send numbers and booleans as strings ("60", "true"): they are accepted.
+// Daemon uses same rules to show arguments to user.
+[[nodiscard]] std::optional<qint64> integerArgument(const QJsonValue &value);
+[[nodiscard]] std::optional<bool> booleanArgument(const QJsonValue &value);
 
 // Answers with error \a message (personal data are masked)
 void finishWithError(TextAutoGenerateTextMcpProtocolCore::McpProtocolServerToolCall *call, const QString &message);

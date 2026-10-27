@@ -15,6 +15,10 @@ target_sources(
         core/toolhelpers.cpp
         core/privacyfilter.h
         core/privacyfilter.cpp
+        core/changejournal.h
+        core/changejournal.cpp
+        core/actions.h
+        core/actions.cpp
         backends/audiobackend.h
         backends/audiobackend.cpp
         backends/pulseaudiobackend.h
@@ -49,6 +53,10 @@ target_sources(
         modules/logmodule.cpp
         modules/reportmodule.h
         modules/reportmodule.cpp
+        modules/audioactions.h
+        modules/audioactions.cpp
+        modules/systemactions.h
+        modules/systemactions.cpp
 )
 
 if(COMPILE_WITH_UNITY_CMAKE_SUPPORT)

@@ -138,6 +138,32 @@ void ToolHelpers::callTool(McpProtocolServerProtocolManager *manager,
     handler(call);
 }
 
+std::optional<qint64> ToolHelpers::integerArgument(const QJsonValue &value)
+{
+    if (value.isDouble()) {
+        return value.toInteger();
+    }
+    if (value.isString()) {
+        bool ok = false;
+        const qint64 result = value.toString().trimmed().toLongLong(&ok);
+        if (ok) {
+            return result;
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<bool> ToolHelpers::booleanArgument(const QJsonValue &value)
+{
+    if (value.isBool()) {
+        return value.toBool();
+    }
+    if (const QString text = value.toString().trimmed().toLower(); text == "true"_L1 || text == "false"_L1) {
+        return text == "true"_L1;
+    }
+    return std::nullopt;
+}
+
 void ToolHelpers::finishWithError(McpProtocolServerToolCall *call, const QString &message)
 {
     call->finishWithText(PrivacyFilter::instance()->filter(message), true);

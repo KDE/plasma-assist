@@ -16,4 +16,5 @@ public:
 
     void fetchStatus(QObject *context, const StatusCallback &callback) override;
     void fetchInhibitors(QObject *context, const InhibitorsCallback &callback) override;
+    void setPowerProfile(const QString &profile, QObject *context, const ErrorCallback &callback) override;
 };

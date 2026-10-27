@@ -203,3 +203,15 @@ void SystemPowerBackend::fetchInhibitors(QObject *context, const InhibitorsCallb
             done();
         });
 }
+
+void SystemPowerBackend::setPowerProfile(const QString &profile, QObject *context, const ErrorCallback &callback)
+{
+    QDBusMessage message = QDBusMessage::createMethodCall(powerDevilService,
+                                                          u"/org/kde/Solid/PowerManagement/Actions/PowerProfile"_s,
+                                                          u"org.kde.Solid.PowerManagement.Actions.PowerProfile"_s,
+                                                          u"setProfile"_s);
+    message.setArguments({profile});
+    callDBus(QDBusConnection::sessionBus(), message, context, [callback](const QDBusMessage &reply) {
+        callback(reply.type() == QDBusMessage::ErrorMessage ? reply.errorMessage() : QString());
+    });
+}

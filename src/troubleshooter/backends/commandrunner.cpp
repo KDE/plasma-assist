@@ -36,6 +36,8 @@ QString ProcessCommandRunner::program(Command command)
         return u"coredumpctl"_s;
     case Command::Journalctl:
         return u"journalctl"_s;
+    case Command::Systemctl:
+        return u"systemctl"_s;
     }
     return {};
 }

@@ -8,7 +8,9 @@
 #include <TextAutoGenerateTextMcpProtocolCore/McpProtocolServerProtocolManager>
 #include <memory>
 
+class ActionRunner;
 class AudioBackend;
+class ChangeJournal;
 class CommandRunner;
 class DisplayBackend;
 class NetworkBackend;
@@ -29,4 +31,6 @@ private:
     const std::unique_ptr<NetworkBackend> mNetworkBackend;
     const std::unique_ptr<PowerBackend> mPowerBackend;
     const std::unique_ptr<CommandRunner> mCommandRunner;
+    const std::unique_ptr<ChangeJournal> mChangeJournal;
+    const std::unique_ptr<ActionRunner> mActionRunner;
 };

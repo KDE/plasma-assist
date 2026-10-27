@@ -9,6 +9,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QProcess>
+#include <QTemporaryDir>
 #include <QTest>
 
 using namespace Qt::Literals::StringLiterals;
@@ -78,6 +79,9 @@ void startProcess(QProcess &process)
 {
     QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
     environment.insert(u"QT_QPA_PLATFORM"_s, u"offscreen"_s);
+    // Journal of changes is not written in state of user
+    static const QTemporaryDir stateDirectory;
+    environment.insert(u"XDG_STATE_HOME"_s, stateDirectory.path());
     process.setProcessEnvironment(environment);
     process.start(QStringLiteral(TROUBLESHOOTER_BINARY), {});
 }
@@ -138,8 +142,12 @@ void TroubleshooterServerTest::shouldListToolsWithAnnotations()
         QVERIFY2(annotations.contains("readOnlyHint"_L1), qPrintable(name));
         QVERIFY2(!tool.value("description"_L1).toString().isEmpty(), qPrintable(name));
         QVERIFY2(!tool.value("_meta"_L1).toObject().value("org.kde/group"_L1).toString().isEmpty(), qPrintable(name));
-        if (name.startsWith("get_"_L1) || name.startsWith("list_"_L1)) {
+        if (name.startsWith("get_"_L1) || name.startsWith("list_"_L1) || name.startsWith("read_"_L1) || name.startsWith("check_"_L1)) {
             QVERIFY2(annotations.value("readOnlyHint"_L1).toBool(), qPrintable(name));
+        } else {
+            // Actions are confirmed by user
+            QVERIFY2(!annotations.value("readOnlyHint"_L1).toBool(), qPrintable(name));
+            QCOMPARE(annotations.value("destructiveHint"_L1).toBool(), name == "restart_plasmashell"_L1);
         }
     }
     QVERIFY(names.contains(u"get_system_info"_s));
@@ -157,7 +165,18 @@ void TroubleshooterServerTest::shouldListToolsWithAnnotations()
                               u"get_crash_backtrace"_s,
                               u"read_journal"_s,
                               u"get_system_report"_s};
-    for (const QString &tool : m3Tools) {
+    const QStringList m6Tools{u"set_default_audio_device"_s,
+                              u"set_audio_volume"_s,
+                              u"set_audio_mute"_s,
+                              u"set_card_profile"_s,
+                              u"move_audio_stream"_s,
+                              u"set_wifi_enabled"_s,
+                              u"reconnect_network"_s,
+                              u"set_power_profile"_s,
+                              u"restart_plasmashell"_s,
+                              u"list_changes"_s,
+                              u"undo_change"_s};
+    for (const QString &tool : m3Tools + m6Tools) {
         QVERIFY2(names.contains(tool), qPrintable(tool));
     }
 
@@ -218,8 +237,9 @@ void TroubleshooterServerTest::shouldAnswerEveryTool()
     for (const QJsonValue &value : tools) {
         const QJsonObject tool = value.toObject();
         const QString name = tool.value("name"_L1).toString();
-        // Tests don't contact Internet
-        if (tool.value("annotations"_L1).toObject().value("openWorldHint"_L1).toBool()) {
+        // Tests don't contact Internet and don't change system
+        const QJsonObject annotations = tool.value("annotations"_L1).toObject();
+        if (annotations.value("openWorldHint"_L1).toBool() || !annotations.value("readOnlyHint"_L1).toBool()) {
             continue;
         }
         QJsonObject arguments;

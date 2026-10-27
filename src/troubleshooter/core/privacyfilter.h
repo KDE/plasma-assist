@@ -42,6 +42,8 @@ public:
 
     // Original value of \a pseudonym (empty if unknown): used when language model gives a pseudonym as argument
     [[nodiscard]] QString originalValue(const QString &pseudonym) const;
+    // Replaces known pseudonyms in strings of \a value by original values (arguments of actions)
+    [[nodiscard]] QJsonValue restore(const QJsonValue &value) const;
 
 private:
     [[nodiscard]] QString pseudonym(const QString &category, const QString &value);

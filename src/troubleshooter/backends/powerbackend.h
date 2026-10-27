@@ -48,12 +48,14 @@ class PowerBackend
 public:
     using StatusCallback = std::function<void(const PowerStatus &status, const QString &error)>;
     using InhibitorsCallback = std::function<void(const QList<SleepInhibitor> &inhibitors, const QString &error)>;
+    using ErrorCallback = std::function<void(const QString &error)>;
 
     PowerBackend();
     virtual ~PowerBackend();
 
     virtual void fetchStatus(QObject *context, const StatusCallback &callback) = 0;
     virtual void fetchInhibitors(QObject *context, const InhibitorsCallback &callback) = 0;
+    virtual void setPowerProfile(const QString &profile, QObject *context, const ErrorCallback &callback) = 0;
 
 private:
     Q_DISABLE_COPY_MOVE(PowerBackend)

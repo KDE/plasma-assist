@@ -19,6 +19,8 @@ public:
     enum class Command : uint8_t {
         Coredumpctl,
         Journalctl,
+        // Only to restart services of user session
+        Systemctl,
     };
     // \a output is standard output, \a error is empty when command succeeded
     using Callback = std::function<void(const QByteArray &output, const QString &error)>;

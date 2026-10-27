@@ -91,6 +91,27 @@ AudioDevice audioDevice(const PulseAudioQt::Device *device)
     return result;
 }
 
+PulseAudioQt::Device *findDevice(AudioBackend::DeviceKind kind, const QString &name)
+{
+    const PulseAudioQt::Context *context = PulseAudioQt::Context::instance();
+    if (kind == AudioBackend::DeviceKind::Sink) {
+        const QList<PulseAudioQt::Sink *> sinks = context->sinks();
+        for (PulseAudioQt::Sink *sink : sinks) {
+            if (sink->name() == name) {
+                return sink;
+            }
+        }
+        return nullptr;
+    }
+    const QList<PulseAudioQt::Source *> sources = context->sources();
+    for (PulseAudioQt::Source *source : sources) {
+        if (source->name() == name) {
+            return source;
+        }
+    }
+    return nullptr;
+}
+
 AudioCard audioCard(const PulseAudioQt::Card *card)
 {
     AudioCard result{
@@ -149,6 +170,88 @@ void PulseAudioBackend::fetchState(QObject *context, StateCallback callback)
         },
         Qt::SingleShotConnection);
     connectToServer();
+}
+
+void PulseAudioBackend::whenReady(QObject *context, const ErrorCallback &callback, const std::function<QString()> &function)
+{
+    fetchState(context, [callback, function](const AudioState &, const QString &error) {
+        callback(error.isEmpty() ? function() : error);
+    });
+}
+
+void PulseAudioBackend::setDefaultDevice(DeviceKind kind, const QString &name, QObject *context, const ErrorCallback &callback)
+{
+    whenReady(context, callback, [kind, name]() {
+        PulseAudioQt::Device *device = findDevice(kind, name);
+        if (!device) {
+            return u"Unknown audio device: %1"_s.arg(name);
+        }
+        device->setDefault(true);
+        return QString();
+    });
+}
+
+void PulseAudioBackend::setVolume(DeviceKind kind, const QString &name, int volumePercent, QObject *context, const ErrorCallback &callback)
+{
+    whenReady(context, callback, [kind, name, volumePercent]() {
+        PulseAudioQt::Device *device = findDevice(kind, name);
+        if (!device) {
+            return u"Unknown audio device: %1"_s.arg(name);
+        }
+        device->setVolume(qRound(volumePercent * PulseAudioQt::normalVolume() / 100.0));
+        return QString();
+    });
+}
+
+void PulseAudioBackend::setMuted(DeviceKind kind, const QString &name, bool muted, QObject *context, const ErrorCallback &callback)
+{
+    whenReady(context, callback, [kind, name, muted]() {
+        PulseAudioQt::Device *device = findDevice(kind, name);
+        if (!device) {
+            return u"Unknown audio device: %1"_s.arg(name);
+        }
+        device->setMuted(muted);
+        return QString();
+    });
+}
+
+void PulseAudioBackend::setCardProfile(const QString &card, const QString &profile, QObject *context, const ErrorCallback &callback)
+{
+    whenReady(context, callback, [card, profile]() {
+        const QList<PulseAudioQt::Card *> cards = PulseAudioQt::Context::instance()->cards();
+        for (PulseAudioQt::Card *audioCard : cards) {
+            if (audioCard->name() != card) {
+                continue;
+            }
+            const QList<PulseAudioQt::Profile *> profiles = audioCard->profiles();
+            for (int i = 0; i < profiles.count(); ++i) {
+                if (profiles.at(i)->name() == profile) {
+                    audioCard->setActiveProfileIndex(i);
+                    return QString();
+                }
+            }
+            return u"Unknown profile %1 for card %2"_s.arg(profile, card);
+        }
+        return u"Unknown audio card: %1"_s.arg(card);
+    });
+}
+
+void PulseAudioBackend::moveStream(quint32 streamIndex, const QString &sink, QObject *context, const ErrorCallback &callback)
+{
+    whenReady(context, callback, [streamIndex, sink]() {
+        PulseAudioQt::Device *device = findDevice(DeviceKind::Sink, sink);
+        if (!device) {
+            return u"Unknown audio output: %1"_s.arg(sink);
+        }
+        const QList<PulseAudioQt::SinkInput *> streams = PulseAudioQt::Context::instance()->sinkInputs();
+        for (PulseAudioQt::SinkInput *stream : streams) {
+            if (stream->index() == streamIndex) {
+                stream->setDeviceIndex(device->index());
+                return QString();
+            }
+        }
+        return u"Unknown audio stream: %1"_s.arg(streamIndex);
+    });
 }
 
 void PulseAudioBackend::connectToServer()

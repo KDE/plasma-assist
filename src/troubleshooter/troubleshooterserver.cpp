@@ -11,7 +11,10 @@
 #include "backends/pulseaudiobackend.h"
 #include "backends/systempowerbackend.h"
 #include "config-plasma-assist.h"
+#include "core/actions.h"
+#include "core/changejournal.h"
 #include "core/privacyfilter.h"
+#include "modules/audioactions.h"
 #include "modules/audiomodule.h"
 #include "modules/crashmodule.h"
 #include "modules/displaymodule.h"
@@ -19,6 +22,7 @@
 #include "modules/networkmodule.h"
 #include "modules/powermodule.h"
 #include "modules/reportmodule.h"
+#include "modules/systemactions.h"
 #include "modules/systemmodule.h"
 #include <KConfigGroup>
 #include <KSharedConfig>
@@ -34,6 +38,8 @@ TroubleshooterServer::TroubleshooterServer(QObject *parent)
     , mNetworkBackend(std::make_unique<NetworkManagerBackend>())
     , mPowerBackend(std::make_unique<SystemPowerBackend>())
     , mCommandRunner(std::make_unique<ProcessCommandRunner>())
+    , mChangeJournal(std::make_unique<ChangeJournal>())
+    , mActionRunner(std::make_unique<ActionRunner>(mChangeJournal.get()))
 {
     McpProtocolImplementation serverInfo;
     serverInfo.setName(u"plasma-assist-troubleshooter"_s);
@@ -59,6 +65,11 @@ TroubleshooterServer::TroubleshooterServer(QObject *parent)
     LogModule::registerTools(this, mCommandRunner.get());
     // Uses tools above
     ReportModule::registerTools(this);
+
+    // Actions: client asks user to confirm them (annotations)
+    AudioActions::registerTools(this, mAudioBackend.get(), mActionRunner.get());
+    SystemActions::registerTools(this, mNetworkBackend.get(), mPowerBackend.get(), mCommandRunner.get(), mActionRunner.get());
+    mActionRunner->registerTools(this);
 }
 
 TroubleshooterServer::~TroubleshooterServer() = default;

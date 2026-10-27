@@ -236,3 +236,57 @@ void NetworkManagerBackend::checkHttp(QObject *context, const HttpCallback &call
         callback(statusCode, {});
     });
 }
+
+void NetworkManagerBackend::setWirelessEnabled(bool enabled, QObject *context, const ErrorCallback &callback)
+{
+    Q_UNUSED(context)
+    // Property is set asynchronously by NetworkManagerQt
+    NetworkManager::setWirelessEnabled(enabled);
+    callback({});
+}
+
+void NetworkManagerBackend::reconnect(const QString &name, QObject *context, const ErrorCallback &callback)
+{
+    NetworkManager::Connection::Ptr connection;
+    const NetworkManager::Connection::List connections = NetworkManager::listConnections();
+    for (const NetworkManager::Connection::Ptr &item : connections) {
+        if (item->name() == name) {
+            connection = item;
+            break;
+        }
+    }
+    if (!connection) {
+        callback(u"Unknown connection: %1"_s.arg(name));
+        return;
+    }
+    QString devicePath;
+    QString activePath;
+    const NetworkManager::ActiveConnection::List active = NetworkManager::activeConnections();
+    for (const NetworkManager::ActiveConnection::Ptr &item : active) {
+        if (item->uuid() == connection->uuid()) {
+            activePath = item->path();
+            devicePath = item->devices().value(0);
+            break;
+        }
+    }
+    const auto activate = [connectionPath = connection->path(), devicePath, context, callback]() {
+        auto watcher = new QDBusPendingCallWatcher(NetworkManager::activateConnection(connectionPath, devicePath, QString()), context);
+        QObject::connect(watcher, &QDBusPendingCallWatcher::finished, context, [callback](QDBusPendingCallWatcher *call) {
+            call->deleteLater();
+            callback(call->isError() ? call->error().message() : QString());
+        });
+    };
+    if (activePath.isEmpty()) {
+        activate();
+        return;
+    }
+    auto watcher = new QDBusPendingCallWatcher(NetworkManager::deactivateConnection(activePath), context);
+    QObject::connect(watcher, &QDBusPendingCallWatcher::finished, context, [callback, activate](QDBusPendingCallWatcher *call) {
+        call->deleteLater();
+        if (call->isError()) {
+            callback(call->error().message());
+            return;
+        }
+        activate();
+    });
+}
