@@ -5,7 +5,7 @@
 -->
 <node>
   <interface name="org.kde.plasma.assist.Assistant">
-    <!-- JSON object: version, ready, languageModel (status, error, name, model), troubleshooter (status, error, tools) -->
+    <!-- JSON object: version, ready, actionsAllowed, languageModel (status, error, name, model), troubleshooter (status, error, tools) -->
     <method name="Status">
       <arg type="s" direction="out"/>
     </method>
@@ -36,11 +36,31 @@
     <method name="ListTools">
       <arg type="s" direction="out"/>
     </method>
-    <!-- Calls tool without language model (quick diagnostic). argumentsJson: JSON object.
+    <!-- Calls tool without language model (quick diagnostic): only tools which don't change system. argumentsJson: JSON object.
          Returns MCP tool result (JSON): content, structuredContent, isError -->
     <method name="CallTool">
       <arg name="name" type="s" direction="in"/>
       <arg name="argumentsJson" type="s" direction="in"/>
+      <arg type="s" direction="out"/>
+    </method>
+    <!-- Answer to ConfirmationRequested: 0 = Deny, 1 = Allow, 2 = Always allow this tool (never for destructive tools).
+         Only client which sent message can answer. Returns false when request is unknown -->
+    <method name="Confirm">
+      <arg name="requestId" type="s" direction="in"/>
+      <arg name="answer" type="i" direction="in"/>
+      <arg type="b" direction="out"/>
+    </method>
+    <!-- Actions (tools which change system) are disabled by default -->
+    <method name="SetActionsAllowed">
+      <arg name="allowed" type="b" direction="in"/>
+    </method>
+    <!-- JSON array of changes made by assistant (most recent first): id, dateTime, tool, summary, undoable, undone -->
+    <method name="ListChanges">
+      <arg type="s" direction="out"/>
+    </method>
+    <!-- Restores state before change: refused when system has changed since. Returns MCP tool result (JSON) -->
+    <method name="UndoChange">
+      <arg name="changeId" type="s" direction="in"/>
       <arg type="s" direction="out"/>
     </method>
     <signal name="StatusChanged">
@@ -68,6 +88,26 @@
       <arg name="callId" type="s" direction="out"/>
       <arg name="result" type="s" direction="out"/>
       <arg name="isError" type="b" direction="out"/>
+    </signal>
+    <!-- Assistant needs a confirmation before changing system. risk: modify or destructive.
+         Request is denied after 120 seconds -->
+    <signal name="ConfirmationRequested">
+      <arg name="requestId" type="s" direction="out"/>
+      <arg name="conversation" type="s" direction="out"/>
+      <arg name="tool" type="s" direction="out"/>
+      <arg name="summary" type="s" direction="out"/>
+      <arg name="argumentsJson" type="s" direction="out"/>
+      <arg name="risk" type="s" direction="out"/>
+    </signal>
+    <signal name="ConfirmationFinished">
+      <arg name="requestId" type="s" direction="out"/>
+      <arg name="allowed" type="b" direction="out"/>
+    </signal>
+    <signal name="ChangesChanged"/>
+    <!-- Information shown in conversation (e.g. an action was refused because actions are disabled) -->
+    <signal name="ConversationNotice">
+      <arg name="conversation" type="s" direction="out"/>
+      <arg name="text" type="s" direction="out"/>
     </signal>
     <signal name="ConversationError">
       <arg name="conversation" type="s" direction="out"/>

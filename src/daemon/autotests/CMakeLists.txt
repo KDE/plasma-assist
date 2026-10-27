@@ -12,3 +12,4 @@ macro(add_plasma_assist_daemon_unittest _source)
 endmacro()
 
 add_plasma_assist_daemon_unittest(assistanttest.cpp)
+add_plasma_assist_daemon_unittest(confirmationmanagertest.cpp)

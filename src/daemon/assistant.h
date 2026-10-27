@@ -6,10 +6,13 @@
 #pragma once
 
 #include <QDBusContext>
+#include <QHash>
+#include <QJsonObject>
 #include <QObject>
 #include <QTimer>
 #include <functional>
 
+class ConfirmationManager;
 class ConversationManager;
 class TroubleshooterClient;
 
@@ -26,8 +29,10 @@ public:
 
     [[nodiscard]] TroubleshooterClient *troubleshooterClient() const;
     [[nodiscard]] ConversationManager *conversationManager() const;
+    [[nodiscard]] ConfirmationManager *confirmationManager() const;
 
-    // Calls tool without language model. \a callback receives JSON result ("isError" is true on error)
+    // Calls tool without language model (only tools which don't change system).
+    // \a callback receives JSON result ("isError" is true on error)
     void callTool(const QString &name, const QString &argumentsJson, QObject *context, const std::function<void(const QString &result)> &callback);
 
     // D-Bus API
@@ -39,6 +44,10 @@ public:
     void Cancel(const QString &conversation);
     [[nodiscard]] QString ListTools();
     QString CallTool(const QString &name, const QString &argumentsJson);
+    bool Confirm(const QString &requestId, int answer);
+    void SetActionsAllowed(bool allowed);
+    QString ListChanges();
+    QString UndoChange(const QString &changeId);
 
 Q_SIGNALS:
     void StatusChanged(const QString &status);
@@ -48,14 +57,30 @@ Q_SIGNALS:
     void ToolCallStarted(const QString &conversation, const QString &callId, const QString &tool, const QString &argumentsJson);
     void ToolCallFinished(const QString &conversation, const QString &callId, const QString &result, bool isError);
     void ConversationError(const QString &conversation, const QString &error);
+    void ConversationNotice(const QString &conversation, const QString &text);
+    void ConfirmationRequested(const QString &requestId,
+                               const QString &conversation,
+                               const QString &tool,
+                               const QString &summary,
+                               const QString &argumentsJson,
+                               const QString &risk);
+    void ConfirmationFinished(const QString &requestId, bool allowed);
+    void ChangesChanged();
     // Daemon is not used anymore: application can quit
     void idleTimeout();
 
 private:
+    // Calls tool of server without checking it: \a callback receives MCP result
+    void callServerTool(const QString &name, const QJsonObject &arguments, QObject *context, const std::function<void(const QJsonObject &result)> &callback);
+    // Unknown tools are considered as read only: server answers with an error
+    [[nodiscard]] bool isReadOnlyTool(const QString &name) const;
     void restartIdleTimer();
     void slotIdleTimeout();
 
     TroubleshooterClient *const mTroubleshooterClient;
     ConversationManager *const mConversationManager;
+    ConfirmationManager *const mConfirmationManager;
+    // Tools called by language model, by call id: changes are announced when actions are finished
+    QHash<QString, QString> mToolCalls;
     QTimer mIdleTimer;
 };

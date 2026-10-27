@@ -11,6 +11,8 @@
 #include <QSet>
 #include <QTimer>
 
+class ConfirmationManager;
+
 namespace TextAutoGenerateText
 {
 class TextAutoGenerateManager;
@@ -53,10 +55,14 @@ public:
     // JSON array of messages: id, role ("user" or "assistant"), text, dateTime, inProgress, toolCalls
     [[nodiscard]] QJsonArray messages(const QByteArray &conversation);
     // Message is sent when language model is ready (errorOccurred() is emitted if it can't be loaded).
+    // \a client: D-Bus client which sent message, only it can confirm actions of answer.
     // Returns error when conversation is unknown or busy.
-    [[nodiscard]] QString sendMessage(const QByteArray &conversation, const QString &text);
+    [[nodiscard]] QString sendMessage(const QByteArray &conversation, const QString &text, const QString &client = {});
     bool cancel(const QByteArray &conversation);
     [[nodiscard]] bool hasConversationInProgress() const;
+
+    // Asks user to confirm tools which change system (they are refused without it)
+    void setConfirmationManager(ConfirmationManager *confirmationManager);
 
     // Language models which send data to a remote server are refused unless allowed in plasma-assistrc
     [[nodiscard]] static bool remoteLanguageModelAllowed();
@@ -95,6 +101,8 @@ private:
     QList<PendingMessage> mPendingMessages;
     QSet<QByteArray> mWatchedConversations;
     QSet<QByteArray> mConversationsInProgress;
+    QHash<QByteArray, QString> mConversationClients;
+    ConfirmationManager *mConfirmationManager = nullptr;
     // Answer already sent with messageChunk() and number of tool exchange entries already announced, by message
     QHash<QByteArray, QString> mSentAnswers;
     QHash<QByteArray, qsizetype> mSentToolEntries;

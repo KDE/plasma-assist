@@ -178,4 +178,14 @@ void AssistantTest::shouldRejectInvalidArguments()
     QCOMPARE(assistant.troubleshooterClient()->status(), TroubleshooterClient::Status::Stopped);
 }
 
+void AssistantTest::shouldRefuseActionWithoutLanguageModel()
+{
+    Assistant assistant;
+    // Actions can only be called by assistant, after a confirmation
+    const QJsonObject result = callTool(assistant, u"set_audio_mute"_s, u"{\"muted\": true}"_s);
+    QVERIFY(result.value("isError"_L1).toBool());
+    QVERIFY(result.value("content"_L1).toArray().first().toObject().value("text"_L1).toString().contains("confirmation"_L1));
+    QVERIFY(!statusObject(assistant.Status()).value("actionsAllowed"_L1).toBool());
+}
+
 #include "moc_assistanttest.cpp"

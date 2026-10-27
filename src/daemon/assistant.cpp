@@ -7,9 +7,11 @@
 #include "assistant.h"
 #include "assistantadaptor.h"
 #include "config-plasma-assist.h"
+#include "confirmationmanager.h"
 #include "conversationmanager.h"
 #include "plasmaassist_daemon_debug.h"
 #include "troubleshooterclient.h"
+#include <KLocalizedString>
 #include <QDBusConnection>
 #include <QDateTime>
 #include <QJsonArray>
@@ -40,8 +42,28 @@ Assistant::Assistant(QObject *parent)
     : QObject{parent}
     , mTroubleshooterClient(new TroubleshooterClient(this))
     , mConversationManager(new ConversationManager(this))
+    , mConfirmationManager(new ConfirmationManager(this))
 {
     new AssistantAdaptor(this);
+    mConversationManager->setConfirmationManager(mConfirmationManager);
+    connect(mConfirmationManager,
+            &ConfirmationManager::confirmationRequested,
+            this,
+            [this](const QString &requestId,
+                   const QByteArray &conversation,
+                   const QString &tool,
+                   const QString &summary,
+                   const QString &argumentsJson,
+                   const QString &risk) {
+                Q_EMIT ConfirmationRequested(requestId, QString::fromLatin1(conversation), tool, summary, argumentsJson, risk);
+            });
+    connect(mConfirmationManager, &ConfirmationManager::confirmationFinished, this, &Assistant::ConfirmationFinished);
+    connect(mConfirmationManager, &ConfirmationManager::actionRefused, this, [this](const QByteArray &conversation, const QString &title) {
+        Q_EMIT ConversationNotice(QString::fromLatin1(conversation), i18n("The assistant wanted to use \"%1\", but actions are disabled in settings.", title));
+    });
+    connect(mConfirmationManager, &ConfirmationManager::actionsAllowedChanged, this, [this]() {
+        Q_EMIT StatusChanged(Status());
+    });
     const auto emitStatusChanged = [this]() {
         Q_EMIT StatusChanged(Status());
     };
@@ -63,6 +85,7 @@ Assistant::Assistant(QObject *parent)
             &ConversationManager::toolCallStarted,
             this,
             [this](const QByteArray &conversation, const QString &callId, const QString &tool, const QString &argumentsJson) {
+                mToolCalls.insert(callId, tool);
                 Q_EMIT ToolCallStarted(QString::fromLatin1(conversation), callId, tool, argumentsJson);
             });
     connect(mConversationManager,
@@ -70,6 +93,9 @@ Assistant::Assistant(QObject *parent)
             this,
             [this](const QByteArray &conversation, const QString &callId, const QString &result, bool isError) {
                 Q_EMIT ToolCallFinished(QString::fromLatin1(conversation), callId, result, isError);
+                if (!isReadOnlyTool(mToolCalls.take(callId))) {
+                    Q_EMIT ChangesChanged();
+                }
             });
     connect(mConversationManager, &ConversationManager::errorOccurred, this, [this](const QByteArray &conversation, const QString &error) {
         Q_EMIT ConversationError(QString::fromLatin1(conversation), error);
@@ -106,11 +132,17 @@ ConversationManager *Assistant::conversationManager() const
     return mConversationManager;
 }
 
+ConfirmationManager *Assistant::confirmationManager() const
+{
+    return mConfirmationManager;
+}
+
 QString Assistant::Status() const
 {
     const QJsonObject status{
         {u"version"_s, QStringLiteral(PLASMA_ASSIST_VERSION)},
         {u"ready"_s, mConversationManager->engineStatus() == ConversationManager::EngineStatus::Ready},
+        {u"actionsAllowed"_s, mConfirmationManager->actionsAllowed()},
         {u"languageModel"_s,
          QJsonObject{
              {u"status"_s, mConversationManager->engineStatusName()},
@@ -164,7 +196,9 @@ QString Assistant::GetMessages(const QString &conversation)
 void Assistant::SendMessage(const QString &conversation, const QString &text)
 {
     restartIdleTimer();
-    if (const QString error = mConversationManager->sendMessage(conversation.toLatin1(), text); !error.isEmpty() && calledFromDBus()) {
+    // Only client which sent message can confirm actions
+    const QString client = calledFromDBus() ? message().service() : QString();
+    if (const QString error = mConversationManager->sendMessage(conversation.toLatin1(), text, client); !error.isEmpty() && calledFromDBus()) {
         sendErrorReply(QDBusError::Failed, error);
     }
 }
@@ -215,13 +249,94 @@ void Assistant::callTool(const QString &name, const QString &argumentsJson, QObj
         callback(toJson(errorResult(u"Arguments must be a JSON object: %1"_s.arg(parseError.errorString()))));
         return;
     }
-    mTroubleshooterClient->callTool(name, arguments.object(), context, [callback](const QJsonObject &answer) {
+    mTroubleshooterClient->whenReady(context, [this, name, arguments = arguments.object(), context, callback](const QString &error) {
+        if (!error.isEmpty()) {
+            callback(toJson(errorResult(error)));
+            return;
+        }
+        // Any process of session can call this method: it can't change system without confirmation of user
+        if (!isReadOnlyTool(name)) {
+            callback(toJson(errorResult(u"Tool %1 changes system: only the assistant can call it, after a confirmation of user"_s.arg(name))));
+            return;
+        }
+        callServerTool(name, arguments, context, [callback](const QJsonObject &result) {
+            callback(toJson(result));
+        });
+    });
+}
+
+void Assistant::callServerTool(const QString &name,
+                               const QJsonObject &arguments,
+                               QObject *context,
+                               const std::function<void(const QJsonObject &result)> &callback)
+{
+    restartIdleTimer();
+    mTroubleshooterClient->callTool(name, arguments, context, [callback](const QJsonObject &answer) {
         if (const QJsonValue result = answer.value("result"_L1); result.isObject()) {
-            callback(toJson(result.toObject()));
+            callback(result.toObject());
         } else {
-            callback(toJson(errorResult(answer.value("error"_L1).toObject().value("message"_L1).toString())));
+            callback(errorResult(answer.value("error"_L1).toObject().value("message"_L1).toString()));
         }
     });
+}
+
+bool Assistant::isReadOnlyTool(const QString &name) const
+{
+    const QJsonArray tools = mTroubleshooterClient->tools();
+    for (const QJsonValue &value : tools) {
+        const QJsonObject tool = value.toObject();
+        if (tool.value("name"_L1).toString() == name) {
+            return tool.value("annotations"_L1).toObject().value("readOnlyHint"_L1).toBool();
+        }
+    }
+    return true;
+}
+
+bool Assistant::Confirm(const QString &requestId, int answer)
+{
+    restartIdleTimer();
+    if (answer < static_cast<int>(ConfirmationManager::Answer::Deny) || answer > static_cast<int>(ConfirmationManager::Answer::AlwaysAllow)) {
+        return false;
+    }
+    return mConfirmationManager->confirm(requestId, static_cast<ConfirmationManager::Answer>(answer), calledFromDBus() ? message().service() : QString());
+}
+
+void Assistant::SetActionsAllowed(bool allowed)
+{
+    mConfirmationManager->setActionsAllowed(allowed);
+}
+
+QString Assistant::ListChanges()
+{
+    restartIdleTimer();
+    if (!calledFromDBus()) {
+        return {};
+    }
+    setDelayedReply(true);
+    callServerTool(u"list_changes"_s, {}, this, [request = message(), bus = connection()](const QJsonObject &result) {
+        if (result.value("isError"_L1).toBool()) {
+            bus.send(request.createErrorReply(QDBusError::Failed, result.value("content"_L1).toArray().first().toObject().value("text"_L1).toString()));
+            return;
+        }
+        const QJsonArray changes = result.value("structuredContent"_L1).toObject().value("changes"_L1).toArray();
+        bus.send(request.createReply(QString::fromUtf8(QJsonDocument(changes).toJson(QJsonDocument::Compact))));
+    });
+    return {};
+}
+
+QString Assistant::UndoChange(const QString &changeId)
+{
+    restartIdleTimer();
+    if (!calledFromDBus()) {
+        return {};
+    }
+    // User asks it in user interface: no confirmation, undo is refused when system has changed since
+    setDelayedReply(true);
+    callServerTool(u"undo_change"_s, {{u"id"_s, changeId}}, this, [this, request = message(), bus = connection()](const QJsonObject &result) {
+        bus.send(request.createReply(toJson(result)));
+        Q_EMIT ChangesChanged();
+    });
+    return {};
 }
 
 void Assistant::restartIdleTimer()
@@ -231,7 +346,7 @@ void Assistant::restartIdleTimer()
 
 void Assistant::slotIdleTimeout()
 {
-    if (mTroubleshooterClient->hasPendingRequest() || mConversationManager->hasConversationInProgress()) {
+    if (mTroubleshooterClient->hasPendingRequest() || mConversationManager->hasConversationInProgress() || mConfirmationManager->hasPendingRequest()) {
         restartIdleTimer();
         return;
     }

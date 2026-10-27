@@ -16,6 +16,8 @@ target_sources(
         assistant.cpp
         conversationmanager.h
         conversationmanager.cpp
+        confirmationmanager.h
+        confirmationmanager.cpp
         troubleshooterclient.h
         troubleshooterclient.cpp
         ${plasmaassistdaemon_dbus_SRCS}

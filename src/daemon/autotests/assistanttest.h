@@ -25,4 +25,5 @@ private Q_SLOTS:
     void shouldCallToolWithoutLanguageModel();
     void shouldReturnErrorForUnknownTool();
     void shouldRejectInvalidArguments();
+    void shouldRefuseActionWithoutLanguageModel();
 };

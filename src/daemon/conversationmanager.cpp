@@ -5,6 +5,7 @@
 */
 
 #include "conversationmanager.h"
+#include "confirmationmanager.h"
 #include "plasmaassist_daemon_debug.h"
 #include "troubleshooterclient.h"
 #include <KConfigGroup>
@@ -126,12 +127,30 @@ void ConversationManager::ensureManager()
 
     // Server is only known by daemon: it's not saved in configuration of MCP servers
     mManager->textAutoGenerateTextMcpServerManager()->mcpServerModel()->addMcpServer(TroubleshooterClient::server());
-    // TODO (M6): ask user with D-Bus signal. Until then tools which modify system are refused
+    // Handler is always defined: without it, tools are called without confirmation
     mManager->textAutoGenerateMcpToolsManager()->setConfirmationHandler(
-        [](const TextAutoGenerateMcpToolsManager::ToolConfirmationInfo &info,
-           const std::function<void(TextAutoGenerateMcpToolsManager::ToolConfirmation)> &answer) {
-            qCWarning(PLASMA_ASSIST_DAEMON_LOG) << "Refuse tool which modifies system:" << info.tool.name;
-            answer(TextAutoGenerateMcpToolsManager::ToolConfirmation::Deny);
+        [this](const TextAutoGenerateMcpToolsManager::ToolConfirmationInfo &info,
+               const std::function<void(TextAutoGenerateMcpToolsManager::ToolConfirmation)> &answer) {
+            if (!mConfirmationManager) {
+                qCWarning(PLASMA_ASSIST_DAEMON_LOG) << "Refuse tool which modifies system:" << info.tool.name;
+                answer(TextAutoGenerateMcpToolsManager::ToolConfirmation::Deny);
+                return;
+            }
+            // Handler doesn't know conversation: it's the one which waits for an answer
+            const QByteArray conversation = mConversationsInProgress.isEmpty() ? QByteArray() : *mConversationsInProgress.cbegin();
+            const ConfirmationManager::Request request{
+                .tool = info.tool.name,
+                .title = info.tool.displayName.isEmpty() ? info.tool.name : info.tool.displayName,
+                .arguments = info.arguments,
+                .risk = info.tool.risk == TextAutoGenerateMcpToolsManager::ToolRisk::Modify ? ConfirmationManager::Risk::Modify
+                                                                                            : ConfirmationManager::Risk::Destructive,
+                .conversation = conversation,
+                .client = mConversationClients.value(conversation),
+            };
+            // "Always allow" of ktextaddons would allow destructive tools too: it's managed by confirmation manager
+            mConfirmationManager->request(request, [answer](bool allowed) {
+                answer(allowed ? TextAutoGenerateMcpToolsManager::ToolConfirmation::Allow : TextAutoGenerateMcpToolsManager::ToolConfirmation::Deny);
+            });
         });
 
     connect(mManager, &TextAutoGenerateManager::chatInProgressStatusChanged, this, &ConversationManager::slotConversationInProgressChanged);
@@ -278,7 +297,12 @@ QJsonArray ConversationManager::messages(const QByteArray &conversation)
     return result;
 }
 
-QString ConversationManager::sendMessage(const QByteArray &conversation, const QString &text)
+void ConversationManager::setConfirmationManager(ConfirmationManager *confirmationManager)
+{
+    mConfirmationManager = confirmationManager;
+}
+
+QString ConversationManager::sendMessage(const QByteArray &conversation, const QString &text, const QString &client)
 {
     if (text.trimmed().isEmpty()) {
         return i18n("Message is empty.");
@@ -290,6 +314,7 @@ QString ConversationManager::sendMessage(const QByteArray &conversation, const Q
         return i18n("Conversation is waiting for an answer.");
     }
     mConversationsInProgress.insert(conversation);
+    mConversationClients.insert(conversation, client);
     const PendingMessage message{.conversation = conversation, .text = text};
     switch (mEngineStatus) {
     case EngineStatus::Ready:
