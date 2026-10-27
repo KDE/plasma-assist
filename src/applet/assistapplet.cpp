@@ -458,6 +458,16 @@ void AssistApplet::refreshConversations()
     });
 }
 
+void AssistApplet::clearConversations()
+{
+    // Daemon answers with ConversationsChanged
+    onReply<>(this, mInterface->ClearConversations(), [this](const QDBusPendingReply<> &reply) {
+        if (reply.isError()) {
+            showError(reply.error().message());
+        }
+    });
+}
+
 void AssistApplet::setDaemonAvailable(bool available)
 {
     if (mDaemonAvailable == available) {

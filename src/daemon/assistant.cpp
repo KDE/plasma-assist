@@ -181,6 +181,12 @@ QString Assistant::ListConversations()
     return QString::fromUtf8(QJsonDocument(conversations).toJson(QJsonDocument::Compact));
 }
 
+void Assistant::ClearConversations()
+{
+    restartIdleTimer();
+    mConversationManager->clearConversations();
+}
+
 QString Assistant::GetMessages(const QString &conversation)
 {
     restartIdleTimer();

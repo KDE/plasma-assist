@@ -122,13 +122,27 @@ PlasmaComponents3.ScrollView {
             }
         }
 
-        PlasmaExtras.Heading {
+        RowLayout {
             Layout.fillWidth: true
             Layout.leftMargin: Kirigami.Units.largeSpacing
+            Layout.rightMargin: Kirigami.Units.largeSpacing
             Layout.topMargin: Kirigami.Units.largeSpacing
-            level: 4
-            text: i18n("Recent Conversations")
             visible: Plasmoid.recentConversations.length > 0
+
+            PlasmaExtras.Heading {
+                Layout.fillWidth: true
+                level: 4
+                text: i18n("Recent Conversations")
+            }
+
+            PlasmaComponents3.ToolButton {
+                icon.name: "edit-clear-history"
+                text: i18nc("@action:button", "Clear")
+                display: PlasmaComponents3.AbstractButton.IconOnly
+                PlasmaComponents3.ToolTip.text: i18n("Clear recent conversations")
+                PlasmaComponents3.ToolTip.visible: hovered
+                onClicked: Plasmoid.clearConversations()
+            }
         }
 
         Repeater {

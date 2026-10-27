@@ -54,6 +54,8 @@ public:
     [[nodiscard]] QByteArray newConversation();
     [[nodiscard]] QList<Conversation> conversations();
     [[nodiscard]] bool hasConversation(const QByteArray &conversation);
+    // Removes conversations from database, except those whose answer is in progress
+    void clearConversations();
     // JSON array of messages: id, role ("user" or "assistant"), text, dateTime, inProgress, toolCalls
     [[nodiscard]] QJsonArray messages(const QByteArray &conversation);
     // Message is sent when language model is ready (errorOccurred() is emitted if it can't be loaded).

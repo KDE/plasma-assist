@@ -17,6 +17,8 @@
     <method name="ListConversations">
       <arg type="s" direction="out"/>
     </method>
+    <!-- Removes all conversations, except those whose answer is in progress -->
+    <method name="ClearConversations"/>
     <!-- JSON array of messages: id, role (user, assistant), text, dateTime, inProgress, toolCalls (id, name, arguments, result) -->
     <method name="GetMessages">
       <arg name="conversation" type="s" direction="in"/>

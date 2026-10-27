@@ -19,6 +19,7 @@ private Q_SLOTS:
     void initTestCase();
     void shouldCreateConversation();
     void shouldKeepConversations();
+    void shouldClearConversations();
     void shouldRejectMessageForUnknownConversation();
     void shouldReportErrorWithoutLanguageModel();
     void shouldStartTroubleshooterOnDemand();

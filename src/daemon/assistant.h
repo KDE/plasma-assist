@@ -40,6 +40,7 @@ public:
     [[nodiscard]] QString Status() const;
     [[nodiscard]] QString NewConversation();
     [[nodiscard]] QString ListConversations();
+    void ClearConversations();
     [[nodiscard]] QString GetMessages(const QString &conversation);
     void SendMessage(const QString &conversation, const QString &text);
     void Cancel(const QString &conversation);

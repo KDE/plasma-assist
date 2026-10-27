@@ -90,6 +90,16 @@ void AssistantTest::shouldCreateConversation()
     QCOMPARE(QJsonDocument::fromJson(assistant.GetMessages(first).toUtf8()).array().count(), 0);
 }
 
+void AssistantTest::shouldClearConversations()
+{
+    Assistant assistant;
+    (void)assistant.NewConversation();
+    QSignalSpy conversationsChanged(&assistant, &Assistant::ConversationsChanged);
+    assistant.ClearConversations();
+    QCOMPARE(conversationsChanged.count(), 1);
+    QVERIFY(QJsonDocument::fromJson(assistant.ListConversations().toUtf8()).array().isEmpty());
+}
+
 void AssistantTest::shouldKeepConversations()
 {
     QString identifier;

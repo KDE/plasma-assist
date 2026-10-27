@@ -74,6 +74,8 @@ public:
     // Back to home page
     Q_INVOKABLE void closeConversation();
     Q_INVOKABLE void refreshConversations();
+    // Removes all conversations (except those whose answer is in progress)
+    Q_INVOKABLE void clearConversations();
     // \a answer: 0 deny, 1 allow, 2 always allow this tool
     Q_INVOKABLE void confirm(const QString &requestId, int answer);
     Q_INVOKABLE void setActionsAllowed(bool allowed);

@@ -303,6 +303,25 @@ bool ConversationManager::hasConversation(const QByteArray &conversation)
     return mManager->textAutoGenerateChatsModel()->chatsId().contains(conversation);
 }
 
+void ConversationManager::clearConversations()
+{
+    ensureManager();
+    const QList<QByteArray> conversations = mManager->textAutoGenerateChatsModel()->chatsId();
+    bool removed = false;
+    for (const QByteArray &conversation : conversations) {
+        if (mConversationsInProgress.contains(conversation)) {
+            continue;
+        }
+        mManager->removeDiscussion(conversation);
+        mWatchedConversations.remove(conversation);
+        mConversationClients.remove(conversation);
+        removed = true;
+    }
+    if (removed) {
+        Q_EMIT conversationsChanged();
+    }
+}
+
 TextAutoGenerateMessagesModel *ConversationManager::messagesModel(const QByteArray &conversation)
 {
     if (!hasConversation(conversation)) {
