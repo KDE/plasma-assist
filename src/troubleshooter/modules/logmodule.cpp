@@ -84,6 +84,13 @@ LogModule::JournalArguments LogModule::journalArguments(const QMap<QString, QJso
         // "1h" means one hour ago
         result.arguments.append(u"--since=%1"_s.arg(since.at(0).isDigit() && !since.contains(u'-') ? u'-' + since : since));
     }
+    if (const QString until = toolArguments.value(u"until"_s).toString(); !until.isEmpty()) {
+        if (!sinceExpression.match(until).hasMatch()) {
+            result.error = u"Invalid until value: %1 (examples: 1h, today, 2026-10-27 08:00)"_s.arg(until);
+            return result;
+        }
+        result.arguments.append(u"--until=%1"_s.arg(until.at(0).isDigit() && !until.contains(u'-') ? u'-' + until : until));
+    }
     if (const QString priority = toolArguments.value(u"priority"_s).toString(); !priority.isEmpty()) {
         if (!priorities().contains(priority)) {
             result.error = u"Invalid priority: %1"_s.arg(priority);
@@ -141,6 +148,7 @@ void LogModule::registerTools(McpProtocolServerProtocolManager *manager, Command
                  QJsonObject{{u"type"_s, u"string"_s}, {u"description"_s, u"systemd unit, e.g. NetworkManager.service or plasma-plasmashell.service"_s}}},
                 {u"executable"_s, QJsonObject{{u"type"_s, u"string"_s}, {u"description"_s, u"Name of process, e.g. plasmashell or kwin_wayland"_s}}},
                 {u"since"_s, QJsonObject{{u"type"_s, u"string"_s}, {u"description"_s, u"Entries since: 30min, 1h, 2d, today, yesterday or a date"_s}}},
+                {u"until"_s, QJsonObject{{u"type"_s, u"string"_s}, {u"description"_s, u"Entries until: same format as since"_s}}},
                 {u"priority"_s, McpProtocolServerTool::schemaEnumProperty(priorities(), u"Maximum priority: err shows emerg, alert, crit and err entries"_s)},
                 {u"limit"_s,
                  QJsonObject{{u"type"_s, u"integer"_s},

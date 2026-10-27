@@ -22,4 +22,5 @@ private Q_SLOTS:
     void shouldExitWhenStdinIsClosed();
     void shouldAnswerEveryTool();
     void shouldProvideReportResource();
+    void shouldProvideScenarios();
 };

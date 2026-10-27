@@ -16,6 +16,7 @@
 #include "core/privacyfilter.h"
 #include "modules/audioactions.h"
 #include "modules/audiomodule.h"
+#include "modules/bugreportmodule.h"
 #include "modules/crashmodule.h"
 #include "modules/displaymodule.h"
 #include "modules/logmodule.h"
@@ -24,6 +25,7 @@
 #include "modules/reportmodule.h"
 #include "modules/systemactions.h"
 #include "modules/systemmodule.h"
+#include "prompts/scenarioprompts.h"
 #include <KConfigGroup>
 #include <KSharedConfig>
 #include <TextAutoGenerateTextMcpProtocolCore/McpProtocolImplementation>
@@ -63,8 +65,10 @@ TroubleshooterServer::TroubleshooterServer(QObject *parent)
     PowerModule::registerTools(this, mPowerBackend.get());
     CrashModule::registerTools(this, mCommandRunner.get());
     LogModule::registerTools(this, mCommandRunner.get());
-    // Uses tools above
+    // Use tools above
     ReportModule::registerTools(this);
+    BugReportModule::registerTools(this);
+    ScenarioPrompts::registerPrompts(this);
 
     // Actions: client asks user to confirm them (annotations)
     AudioActions::registerTools(this, mAudioBackend.get(), mActionRunner.get());

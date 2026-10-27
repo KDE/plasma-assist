@@ -57,6 +57,10 @@ target_sources(
         modules/audioactions.cpp
         modules/systemactions.h
         modules/systemactions.cpp
+        modules/bugreportmodule.h
+        modules/bugreportmodule.cpp
+        prompts/scenarioprompts.h
+        prompts/scenarioprompts.cpp
 )
 
 if(COMPILE_WITH_UNITY_CMAKE_SUPPORT)
