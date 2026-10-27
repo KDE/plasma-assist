@@ -79,7 +79,7 @@ QJsonObject CrashModule::crashesToJson(const QByteArray &output, int limit)
     for (auto it = counts.cbegin(); it != counts.cend(); ++it) {
         sortedCounts.append({it.key(), it.value()});
     }
-    std::ranges::stable_sort(sortedCounts, [](const auto &left, const auto &right) {
+    std::ranges::stable_sort(sortedCounts, [](const auto &left, const auto &right) noexcept {
         return left.second > right.second;
     });
     QJsonArray countsArray;

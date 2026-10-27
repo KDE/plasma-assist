@@ -234,7 +234,7 @@ Action cardProfileAction(AudioBackend *backend)
                     if (card.name != current.value("card"_L1).toString()) {
                         continue;
                     }
-                    const bool known = std::ranges::any_of(card.profiles, [&profile](const AudioProfile &cardProfile) {
+                    const bool known = std::ranges::any_of(card.profiles, [&profile](const AudioProfile &cardProfile) noexcept {
                         return cardProfile.name == profile;
                     });
                     if (!known) {

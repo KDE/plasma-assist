@@ -92,7 +92,7 @@ QStringList NetworkModule::hints(const NetworkStatus &status)
         result.append(u"Networking is disabled in NetworkManager"_s);
         return result;
     }
-    const bool hasWifi = std::ranges::any_of(status.interfaces, [](const NetworkInterface &interface) {
+    const bool hasWifi = std::ranges::any_of(status.interfaces, [](const NetworkInterface &interface) noexcept {
         return interface.type == "Wifi"_L1;
     });
     if (hasWifi && !status.wirelessHardwareEnabled) {
@@ -122,7 +122,7 @@ QStringList NetworkModule::hints(const NetworkStatus &status)
             result.append(u"Wi-Fi signal of %1 is weak (%2%)"_s.arg(interface.name).arg(interface.signalStrength));
         }
     }
-    const bool hasGateway = std::ranges::any_of(activated, [](const NetworkInterface &interface) {
+    const bool hasGateway = std::ranges::any_of(activated, [](const NetworkInterface &interface) noexcept {
         return !interface.gateway.isEmpty();
     });
     if (!activated.isEmpty() && !hasGateway) {
