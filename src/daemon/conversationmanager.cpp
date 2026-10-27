@@ -189,7 +189,7 @@ QString ConversationManager::engineError() const
     if (!plugin) {
         return i18n("No language model is configured.");
     }
-    if (plugin->engineType() == TextAutoGenerateTextPlugin::EngineType::Network && !remoteLanguageModelAllowed()) {
+    if (!plugin->isLocalServer() && !remoteLanguageModelAllowed()) {
         // Information about system must not leave the computer without agreement of user
         return i18n("Language model \"%1\" sends data to a remote server, it's not allowed. Select a local language model.", plugin->displayName());
     }
