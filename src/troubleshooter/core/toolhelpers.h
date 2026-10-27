@@ -49,19 +49,33 @@ private:
     const Handler mHandler;
 };
 
-// Description is in English (better understood by language models), title is translated
+// Description is in English (better understood by language models), title is translated.
+// \a openWorld: tool contacts external hosts
 [[nodiscard]] TextAutoGenerateTextMcpProtocolCore::McpProtocolTool createTool(const QString &name,
                                                                               const QString &title,
                                                                               const QString &description,
                                                                               ToolKind kind,
                                                                               const ToolGroup &group,
                                                                               const QMap<QString, QJsonObject> &properties = {},
-                                                                              const QStringList &required = {});
+                                                                              const QStringList &required = {},
+                                                                              bool openWorld = false);
 
 void addFunctionTool(TextAutoGenerateTextMcpProtocolCore::McpProtocolServerProtocolManager *manager,
                      const TextAutoGenerateTextMcpProtocolCore::McpProtocolTool &definition,
                      FunctionTool::Handler handler);
 
+// Calls tool \a name registered with addFunctionTool() without client (e.g. to build a report).
+// \a callback receives MCP result (content, structuredContent, isError), it's not called if \a context is deleted.
+void callTool(TextAutoGenerateTextMcpProtocolCore::McpProtocolServerProtocolManager *manager,
+              const QString &name,
+              const QMap<QString, QJsonValue> &arguments,
+              QObject *context,
+              const std::function<void(const QJsonObject &result)> &callback);
+
+// Answers with error \a message (personal data are masked)
+void finishWithError(TextAutoGenerateTextMcpProtocolCore::McpProtocolServerToolCall *call, const QString &message);
+
+// Personal data are masked by PrivacyFilter.
 // Answers with \a result as structuredContent, and with \a summary and serialized \a result as text contents:
 // clients which ignore structuredContent (e.g. ktextaddons) give only text to language model
 void finishWithJson(TextAutoGenerateTextMcpProtocolCore::McpProtocolServerToolCall *call, const QJsonObject &result, const QString &summary);

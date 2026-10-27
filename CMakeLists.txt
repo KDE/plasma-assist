@@ -130,6 +130,7 @@ find_package(
         Concurrent
         DBus
         Gui
+        Network
         Quick
 )
 find_package(
@@ -140,6 +141,8 @@ find_package(
         Config
         CoreAddons
         I18n
+        NetworkManagerQt
+        Solid
 )
 
 find_package(Plasma ${PLASMA_MIN_VERSION} REQUIRED)

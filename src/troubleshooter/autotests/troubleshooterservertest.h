@@ -20,4 +20,6 @@ private Q_SLOTS:
     void shouldCallTool_data();
     void shouldCallTool();
     void shouldExitWhenStdinIsClosed();
+    void shouldAnswerEveryTool();
+    void shouldProvideReportResource();
 };

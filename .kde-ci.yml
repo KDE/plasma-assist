@@ -4,7 +4,11 @@
 Dependencies:
  - 'on': ['Linux']
    'require':
+    'frameworks/kconfig': '@latest-kf6'
     'frameworks/kcoreaddons': '@latest-kf6'
+    'frameworks/networkmanager-qt': '@latest-kf6'
+    'frameworks/solid': '@latest-kf6'
+    'libraries/pulseaudio-qt': '@latest-kf6'
     'frameworks/ki18n': '@latest-kf6'
     'frameworks/kdoctools': '@latest-kf6'
     'libraries/ktextaddons': '@latest-kf6'

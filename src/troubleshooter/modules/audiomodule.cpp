@@ -77,7 +77,7 @@ void finishWithState(McpProtocolServerToolCall *call,
 {
     backend->fetchState(call, [call, handler](const AudioState &state, const QString &error) {
         if (!error.isEmpty()) {
-            call->finishWithText(error, true);
+            ToolHelpers::finishWithError(call, error);
             return;
         }
         handler(call, state);

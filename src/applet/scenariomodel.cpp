@@ -26,6 +26,24 @@ ScenarioModel::ScenarioModel(QObject *parent)
               .prompt = i18n("My external screen does not work correctly. Check my screens and tell me how to fix it."),
           },
           {
+              .identifier = u"network_problem"_s,
+              .title = i18nc("@action:button scenario", "Internet or Wi-Fi"),
+              .iconName = u"network-wireless"_s,
+              .prompt = i18n("Internet or Wi-Fi does not work. Check my network and tell me how to fix it."),
+          },
+          {
+              .identifier = u"no_sleep"_s,
+              .title = i18nc("@action:button scenario", "Computer Does Not Sleep"),
+              .iconName = u"system-suspend"_s,
+              .prompt = i18n("My computer does not go to sleep. Find out what prevents it."),
+          },
+          {
+              .identifier = u"app_crash"_s,
+              .title = i18nc("@action:button scenario", "Application Crashes"),
+              .iconName = u"tools-report-bug"_s,
+              .prompt = i18n("An application crashed. Find out which one and why."),
+          },
+          {
               .identifier = u"system_report"_s,
               .title = i18nc("@action:button scenario", "System Report"),
               .iconName = u"document-properties"_s,

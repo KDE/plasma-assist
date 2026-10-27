@@ -13,6 +13,8 @@ target_sources(
         troubleshooterserver.cpp
         core/toolhelpers.h
         core/toolhelpers.cpp
+        core/privacyfilter.h
+        core/privacyfilter.cpp
         backends/audiobackend.h
         backends/audiobackend.cpp
         backends/pulseaudiobackend.h
@@ -21,12 +23,32 @@ target_sources(
         backends/displaybackend.cpp
         backends/kscreenbackend.h
         backends/kscreenbackend.cpp
+        backends/networkbackend.h
+        backends/networkbackend.cpp
+        backends/networkmanagerbackend.h
+        backends/networkmanagerbackend.cpp
+        backends/powerbackend.h
+        backends/powerbackend.cpp
+        backends/systempowerbackend.h
+        backends/systempowerbackend.cpp
+        backends/commandrunner.h
+        backends/commandrunner.cpp
         modules/systemmodule.h
         modules/systemmodule.cpp
         modules/audiomodule.h
         modules/audiomodule.cpp
         modules/displaymodule.h
         modules/displaymodule.cpp
+        modules/networkmodule.h
+        modules/networkmodule.cpp
+        modules/powermodule.h
+        modules/powermodule.cpp
+        modules/crashmodule.h
+        modules/crashmodule.cpp
+        modules/logmodule.h
+        modules/logmodule.cpp
+        modules/reportmodule.h
+        modules/reportmodule.cpp
 )
 
 if(COMPILE_WITH_UNITY_CMAKE_SUPPORT)
@@ -45,7 +67,12 @@ target_link_libraries(
         KF6::TextAutoGenerateTextMcpProtocolCore
     PRIVATE
         Qt::Concurrent
+        Qt::DBus
+        Qt::Network
+        KF6::ConfigCore
         KF6::CoreAddons
+        KF6::NetworkManagerQt
+        KF6::Solid
         KF6::I18n
         KF6::PulseAudioQt
         KF6::Screen

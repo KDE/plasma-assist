@@ -9,7 +9,10 @@
 #include <memory>
 
 class AudioBackend;
+class CommandRunner;
 class DisplayBackend;
+class NetworkBackend;
+class PowerBackend;
 
 // MCP server (stdio) which provides tools to diagnose and fix KDE Plasma desktop
 class TroubleshooterServer : public TextAutoGenerateTextMcpProtocolCore::McpProtocolServerProtocolManager
@@ -23,4 +26,7 @@ private:
     // Used by tools. Deleted before base class (tools): no tool is called during destruction
     const std::unique_ptr<AudioBackend> mAudioBackend;
     const std::unique_ptr<DisplayBackend> mDisplayBackend;
+    const std::unique_ptr<NetworkBackend> mNetworkBackend;
+    const std::unique_ptr<PowerBackend> mPowerBackend;
+    const std::unique_ptr<CommandRunner> mCommandRunner;
 };

@@ -162,7 +162,7 @@ void DisplayModule::registerTools(McpProtocolServerProtocolManager *manager, Dis
         [backend](McpProtocolServerToolCall *call) {
             backend->fetchOutputs(call, [call](const QList<DisplayOutput> &outputs, const QString &error) {
                 if (!error.isEmpty()) {
-                    call->finishWithText(error, true);
+                    ToolHelpers::finishWithError(call, error);
                     return;
                 }
                 const qsizetype connectedCount = std::count_if(outputs.cbegin(), outputs.cend(), [](const DisplayOutput &output) {
