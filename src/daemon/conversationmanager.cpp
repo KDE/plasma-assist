@@ -274,7 +274,7 @@ QByteArray ConversationManager::newConversation()
     // New chat becomes current chat only when language model is initialized: look for it in chats
     mManager->createNewChat({}, TextAutoGenerateChat::Persistence::Persisted);
     const QList<QByteArray> conversations = mManager->textAutoGenerateChatsModel()->chatsId();
-    const auto it = std::ranges::find_if(conversations, [&previousConversations](const QByteArray &conversation) {
+    const auto it = std::ranges::find_if(conversations, [&previousConversations](const QByteArray &conversation) noexcept {
         return !previousConversations.contains(conversation);
     });
     if (it == conversations.cend()) {

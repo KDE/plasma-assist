@@ -105,7 +105,7 @@ QStringList PrivacyFilter::sensitiveWords() const
     });
     words.removeDuplicates();
     // "Home Network 5G" before "Home Network"
-    std::ranges::sort(words, [](const QString &left, const QString &right) {
+    std::ranges::sort(words, [](const QString &left, const QString &right) noexcept {
         return left.size() > right.size();
     });
     return words;

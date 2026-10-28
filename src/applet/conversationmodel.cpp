@@ -213,7 +213,7 @@ void ConversationModel::finishConfirmation(const QString &requestId, bool allowe
 
 bool ConversationModel::hasPendingConfirmation() const
 {
-    return std::ranges::any_of(mItems, [](const Item &item) {
+    return std::ranges::any_of(mItems, [](const Item &item) noexcept {
         return item.type == confirmationType && item.status == "pending"_L1;
     });
 }
