@@ -107,7 +107,7 @@ private:
     void refreshScenarios();
     void showError(const QString &error);
     void updateConfirmationPending();
-    void notifyConfirmation(const QString &requestId, const QString &summary);
+    void notifyConfirmation(const QString &requestId, const QString &summary, const QString &risk);
 
     OrgKdePlasmaAssistAssistantInterface *const mInterface;
     QDBusServiceWatcher *const mServiceWatcher;

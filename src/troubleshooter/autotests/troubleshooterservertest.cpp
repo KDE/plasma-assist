@@ -176,6 +176,7 @@ void TroubleshooterServerTest::shouldListToolsWithAnnotations()
                               u"reconnect_network"_s,
                               u"set_power_profile"_s,
                               u"restart_plasmashell"_s,
+                              u"set_output_config"_s,
                               u"list_changes"_s,
                               u"undo_change"_s};
     for (const QString &tool : m3Tools + m6Tools) {

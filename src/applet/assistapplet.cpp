@@ -100,7 +100,7 @@ AssistApplet::AssistApplet(QObject *parent, const KPluginMetaData &data, const Q
                     mConversationModel->addConfirmation(requestId, tool, summary, arguments, risk);
                     updateConfirmationPending();
                     if (!mPopupOpen) {
-                        notifyConfirmation(requestId, summary);
+                        notifyConfirmation(requestId, summary, risk);
                     }
                 }
             });
@@ -264,13 +264,28 @@ void AssistApplet::showConfigureDialog()
     mInterface->ShowConfigureDialog();
 }
 
-void AssistApplet::notifyConfirmation(const QString &requestId, const QString &summary)
+void AssistApplet::notifyConfirmation(const QString &requestId, const QString &summary, const QString &risk)
 {
     auto notification = new KNotification(u"confirmationRequested"_s, KNotification::Persistent);
     notification->setComponentName(u"plasma_assist"_s);
-    notification->setTitle(i18n("The assistant needs your confirmation"));
     notification->setText(summary);
     notification->setIconName(u"help-browser"_s);
+    mNotifications.insert(requestId, notification);
+    if (risk == "keep"_L1) {
+        // Change is reverted without answer: user can answer without opening popup
+        notification->setTitle(i18n("Keep the change made by the assistant?"));
+        KNotificationAction *keepAction = notification->addAction(i18nc("@action:button keep display settings", "Keep"));
+        connect(keepAction, &KNotificationAction::activated, this, [this, requestId]() {
+            confirm(requestId, 1);
+        });
+        KNotificationAction *revertAction = notification->addAction(i18nc("@action:button restore previous display settings", "Revert"));
+        connect(revertAction, &KNotificationAction::activated, this, [this, requestId]() {
+            confirm(requestId, 0);
+        });
+        notification->sendEvent();
+        return;
+    }
+    notification->setTitle(i18n("The assistant needs your confirmation"));
     KNotificationAction *openAction = notification->addAction(i18nc("@action:button", "Open"));
     connect(openAction, &KNotificationAction::activated, this, [this]() {
         // Popup is opened
@@ -280,7 +295,6 @@ void AssistApplet::notifyConfirmation(const QString &requestId, const QString &s
     connect(denyAction, &KNotificationAction::activated, this, [this, requestId]() {
         confirm(requestId, 0);
     });
-    mNotifications.insert(requestId, notification);
     notification->sendEvent();
 }
 

@@ -37,17 +37,29 @@ struct DisplayOutput {
     bool enabled = false;
 };
 
+// Settings changed by set_output_config
+struct DisplayOutputSettings {
+    bool enabled = false;
+    // Ignored when output is disabled
+    QString modeId;
+    double scale = 1.0;
+    QPoint position;
+};
+
 class DisplayBackend
 {
 public:
     // Error is empty on success
     using OutputsCallback = std::function<void(const QList<DisplayOutput> &outputs, const QString &error)>;
+    using ErrorCallback = std::function<void(const QString &error)>;
 
     DisplayBackend();
     virtual ~DisplayBackend();
 
     // Asynchronous. Callback is not called when \a context is deleted
     virtual void fetchOutputs(QObject *context, OutputsCallback callback) = 0;
+    // Applies \a settings to output \a name (connector). Callback is not called when \a context is deleted
+    virtual void applyOutputSettings(const QString &name, const DisplayOutputSettings &settings, QObject *context, ErrorCallback callback) = 0;
 
 private:
     Q_DISABLE_COPY_MOVE(DisplayBackend)

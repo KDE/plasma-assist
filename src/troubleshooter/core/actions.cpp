@@ -11,7 +11,11 @@
 #include <QElapsedTimer>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QPointer>
 #include <QTimer>
+#include <TextAutoGenerateTextMcpProtocolCore/McpProtocolElicitRequestFormParams>
+#include <TextAutoGenerateTextMcpProtocolCore/McpProtocolElicitRequestURLParams>
+#include <TextAutoGenerateTextMcpProtocolCore/McpProtocolElicitResult>
 #include <TextAutoGenerateTextMcpProtocolCore/McpProtocolServerProtocolManager>
 #include <TextAutoGenerateTextMcpProtocolCore/McpProtocolServerToolCall>
 
@@ -23,6 +27,8 @@ namespace
 {
 constexpr auto pollInterval = 100ms;
 constexpr int listedChanges = 20;
+// Answer of user given at end of timeout shown by client needs time to come back
+constexpr auto answerDelay = 1s;
 
 QJsonObject arguments(McpProtocolServerToolCall *call)
 {
@@ -102,11 +108,154 @@ void finish(McpProtocolServerToolCall *call, const QJsonObject &result, const QS
     }
     ToolHelpers::finishWithJson(call, result, result.value("summary"_L1).toString());
 }
+
+// Change made by runWithRevert(): it's reverted unless user keeps it. Deletes itself when it's finished
+class PendingRevert : public QObject
+{
+public:
+    PendingRevert(ActionRunner *runner, QObject *context, const ActionRunner::ResultCallback &callback, QObject *parent)
+        : QObject(parent)
+        , mRunner(runner)
+        , mContext(context)
+        , mCallback(callback)
+    {
+        mTimer.setSingleShot(true);
+        connect(&mTimer, &QTimer::timeout, this, [this]() {
+            revert(u"user didn't keep it in time"_s);
+        });
+    }
+
+    void start(const QString &tool, const QJsonObject &arguments, const ActionRunner::KeepQuestion &ask, std::chrono::milliseconds timeout)
+    {
+        // Change must be reverted even when request is cancelled: runner doesn't use context of request
+        mRunner->run(tool, arguments, this, [this, ask, timeout](const QJsonObject &result, const QString &error) {
+            if (!error.isEmpty() || !result.value("changed"_L1).toBool()) {
+                finish(result, error);
+                return;
+            }
+            mResult = result;
+            if (mRevertRequested || !mContext) {
+                revert(u"request was cancelled"_s);
+                return;
+            }
+            connect(mContext, &QObject::destroyed, this, [this]() {
+                revert(u"request was cancelled"_s);
+            });
+            mTimer.start(timeout + answerDelay);
+            const QString question = i18nc("@info", "Keep this change? %1", result.value("summary"_L1).toString());
+            const bool asked = ask(question, timeout, this, [this](bool keep) {
+                if (keep) {
+                    this->keep();
+                } else {
+                    revert(u"user didn't keep it"_s);
+                }
+            });
+            if (!asked) {
+                revert(u"client can't ask user to keep it"_s);
+            }
+        });
+    }
+
+    void revertNow()
+    {
+        if (mResult.isEmpty()) {
+            // Change is not applied yet
+            mRevertRequested = true;
+            return;
+        }
+        revert(u"server stops"_s);
+    }
+
+private:
+    void keep()
+    {
+        if (mAnswered) {
+            return;
+        }
+        mAnswered = true;
+        mTimer.stop();
+        QJsonObject result = mResult;
+        result.insert(u"kept"_s, true);
+        finish(result, {});
+    }
+
+    void revert(const QString &reason)
+    {
+        if (mAnswered) {
+            return;
+        }
+        mAnswered = true;
+        mTimer.stop();
+        const QString changeIdentifier = mResult.value("changeId"_L1).toString();
+        const QString summary = mResult.value("summary"_L1).toString();
+        mRunner->undo(changeIdentifier, this, [this, changeIdentifier, summary, reason](const QJsonObject &, const QString &error) {
+            if (!error.isEmpty()) {
+                finish({}, u"Change was not kept (%1) but it can't be reverted: %2"_s.arg(reason, error));
+                return;
+            }
+            finish(QJsonObject{{u"changed"_s, false},
+                               {u"reverted"_s, true},
+                               {u"changeId"_s, changeIdentifier},
+                               {u"summary"_s, i18nc("@info change", "Reverted: %1", summary)},
+                               {u"reason"_s, u"Change was reverted: %1"_s.arg(reason)}},
+                   {});
+        });
+    }
+
+    void finish(const QJsonObject &result, const QString &error)
+    {
+        if (mContext) {
+            mCallback(result, error);
+        }
+        deleteLater();
+    }
+
+    ActionRunner *const mRunner;
+    const QPointer<QObject> mContext;
+    const ActionRunner::ResultCallback mCallback;
+    // Result of change, empty until it's applied
+    QJsonObject mResult;
+    QTimer mTimer;
+    bool mAnswered = false;
+    bool mRevertRequested = false;
+};
+
+// Asks with an elicitation without field: accepted means keep
+ActionRunner::KeepQuestion elicitationQuestion(McpProtocolServerProtocolManager *manager)
+{
+    return [manager](const QString &question, std::chrono::milliseconds timeout, QObject *context, const std::function<void(bool keep)> &answer) {
+        McpProtocolElicitRequestFormParams params;
+        params.setMessage(question);
+        // Client shows remaining time, server reverts change anyway
+        McpProtocolRequestMeta meta;
+        meta.setAdditionalProperties({{u"org.kde/timeoutSeconds"_s, static_cast<qint64>(std::chrono::ceil<std::chrono::seconds>(timeout).count())}});
+        params.setMeta(meta);
+        const qint64 requestId = manager->requestElicitation(params);
+        if (requestId < 0) {
+            return false;
+        }
+        QObject::connect(manager,
+                         &McpProtocolServerProtocolManager::elicitationResultReceived,
+                         context,
+                         [requestId, answer](qint64 identifier, const McpProtocolElicitResult &result) {
+                             if (identifier == requestId) {
+                                 answer(result.action() == McpProtocolElicitResult::Action::Accept);
+                             }
+                         });
+        QObject::connect(manager, &McpProtocolServerProtocolManager::clientRequestFailed, context, [requestId, answer](qint64 identifier) {
+            if (identifier == requestId) {
+                answer(false);
+            }
+        });
+        return true;
+    };
+}
 }
 
 ActionRunner::ActionRunner(ChangeJournal *journal)
     : mJournal(journal)
     , mApplyTimeout(3s)
+    , mRevertTimeout(15s)
 {
 }
 
@@ -115,6 +264,40 @@ ActionRunner::~ActionRunner() = default;
 void ActionRunner::setApplyTimeout(std::chrono::milliseconds timeout)
 {
     mApplyTimeout = timeout;
+}
+
+void ActionRunner::setRevertTimeout(std::chrono::milliseconds timeout)
+{
+    mRevertTimeout = timeout;
+}
+
+bool ActionRunner::hasPendingRevert() const
+{
+    return !mPendingReverts.children().isEmpty();
+}
+
+void ActionRunner::revertPendingChanges(const std::function<void()> &callback)
+{
+    const QObjectList pending = mPendingReverts.children();
+    if (pending.isEmpty()) {
+        callback();
+        return;
+    }
+    auto remaining = std::make_shared<qsizetype>(pending.count());
+    for (QObject *object : pending) {
+        QObject::connect(object, &QObject::destroyed, &mPendingReverts, [remaining, callback]() {
+            if (--*remaining == 0) {
+                callback();
+            }
+        });
+        static_cast<PendingRevert *>(object)->revertNow();
+    }
+}
+
+void ActionRunner::runWithRevert(const QString &tool, const QJsonObject &arguments, QObject *context, const KeepQuestion &ask, const ResultCallback &callback)
+{
+    auto pending = new PendingRevert(this, context, callback, &mPendingReverts);
+    pending->start(tool, arguments, ask, mRevertTimeout);
 }
 
 ChangeJournal *ActionRunner::journal() const
@@ -133,6 +316,17 @@ void ActionRunner::addActionTool(McpProtocolServerProtocolManager *manager, cons
     addAction(tool, action);
     ToolHelpers::addFunctionTool(manager, definition, [this, tool](McpProtocolServerToolCall *call) {
         run(tool, arguments(call), call, [call](const QJsonObject &result, const QString &error) {
+            finish(call, result, error);
+        });
+    });
+}
+
+void ActionRunner::addRevertibleActionTool(McpProtocolServerProtocolManager *manager, const McpProtocolTool &definition, const Action &action)
+{
+    const QString tool = definition.name();
+    addAction(tool, action);
+    ToolHelpers::addFunctionTool(manager, definition, [this, tool, manager](McpProtocolServerToolCall *call) {
+        runWithRevert(tool, arguments(call), call, elicitationQuestion(manager), [call](const QJsonObject &result, const QString &error) {
             finish(call, result, error);
         });
     });

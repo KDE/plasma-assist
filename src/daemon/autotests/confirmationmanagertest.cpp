@@ -213,7 +213,40 @@ void ConfirmationManagerTest::shouldCreateSummary()
     // Invalid boolean: all arguments are shown
     QVERIFY(ConfirmationManager::summary(u"set_audio_mute"_s, u"Mute"_s, {{u"muted"_s, u"maybe"_s}}).contains("maybe"_L1));
     // Unknown tool shows all arguments: language model can't hide them
+    QCOMPARE(
+        ConfirmationManager::summary(u"set_output_config"_s, {}, {{u"output"_s, u"HDMI-A-1"_s}, {u"enabled"_s, true}, {u"scale"_s, 1.25}, {u"x"_s, 1920}}),
+        u"Change display HDMI-A-1: enable, scale 1.25, position 1920,unchanged. You will be asked to keep the new settings, otherwise they are reverted."_s);
     QCOMPARE(ConfirmationManager::summary(u"unknown_tool"_s, u"Unknown"_s, {{u"key"_s, u"value"_s}}), u"Unknown with {\"key\":\"value\"}"_s);
+}
+
+void ConfirmationManagerTest::shouldAskToKeepChange()
+{
+    // Change was allowed before: question is asked even when actions are disabled now
+    ConfirmationManager manager;
+    QSignalSpy requested(&manager, &ConfirmationManager::confirmationRequested);
+    ConfirmationManager::Request keepRequest{
+        .tool = {},
+        .title = u"Keep this change? Display HDMI-A-1: disabled → 1920x1080@60Hz"_s,
+        .arguments = {{u"timeoutSeconds"_s, 15}},
+        .risk = ConfirmationManager::Risk::Keep,
+        .conversation = "conversation"_ba,
+        .client = {},
+        .timeout = 200ms,
+    };
+    Answer answer;
+    manager.request(keepRequest, answer.callback());
+    QCOMPARE(requested.count(), 1);
+    QCOMPARE(requested.at(0).at(3).toString(), keepRequest.title);
+    QCOMPARE(requested.at(0).at(5).toString(), u"keep"_s);
+    QVERIFY(manager.confirm(requested.at(0).at(0).toString(), ConfirmationManager::Answer::AlwaysAllow, {}));
+    QCOMPARE(answer.value, 1);
+    // Keeping a change never allows a tool
+    QVERIFY(manager.alwaysAllowedTools().isEmpty());
+
+    // Timeout of request: change is reverted
+    Answer timeoutAnswer;
+    manager.request(keepRequest, timeoutAnswer.callback());
+    QTRY_COMPARE_WITH_TIMEOUT(timeoutAnswer.value, 0, 2000);
 }
 
 #include "moc_confirmationmanagertest.cpp"

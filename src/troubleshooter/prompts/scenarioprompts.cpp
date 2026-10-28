@@ -77,7 +77,9 @@ QList<ScenarioPrompts::Scenario> ScenarioPrompts::scenarios()
             .iconName = u"video-display"_s,
             .request = u"My external screen does not work correctly."_s,
             .steps = {u"list_outputs: connected and enabled screens, modes, scale and position"_s, u"get_system_info: graphic card and driver"_s},
-            .fixes = {u"Explain how to enable the screen, choose its native resolution, scale or position in System Settings > Display & Monitor"_s,
+            .fixes = {u"set_output_config with enabled true when the screen is connected but disabled"_s,
+                      u"set_output_config with resolution of preferredMode when the screen doesn't use its native mode, with scale or x and y "
+                      "when it's blurry, too small or badly placed. Tell user to click Keep: change is reverted after 15 seconds otherwise"_s,
                       u"When the screen is not detected: check cable and input of the screen, graphic driver"_s},
             .diagnosticTools = {u"list_outputs"_s, u"get_system_info"_s},
         },

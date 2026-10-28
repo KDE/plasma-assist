@@ -153,6 +153,21 @@ std::optional<qint64> ToolHelpers::integerArgument(const QJsonValue &value)
     return std::nullopt;
 }
 
+std::optional<double> ToolHelpers::numberArgument(const QJsonValue &value)
+{
+    if (value.isDouble()) {
+        return value.toDouble();
+    }
+    if (value.isString()) {
+        bool ok = false;
+        const double result = value.toString().trimmed().toDouble(&ok);
+        if (ok) {
+            return result;
+        }
+    }
+    return std::nullopt;
+}
+
 std::optional<bool> ToolHelpers::booleanArgument(const QJsonValue &value)
 {
     if (value.isBool()) {

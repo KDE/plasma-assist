@@ -22,4 +22,9 @@ private Q_SLOTS:
     void shouldReportChangeNotApplied();
     void shouldWaitForAsynchronousChange();
     void shouldRecordActionWithoutState();
+    void shouldKeepChange();
+    void shouldRevertChange_data();
+    void shouldRevertChange();
+    void shouldRevertWhenRequestIsCancelled();
+    void shouldRevertPendingChanges();
 };

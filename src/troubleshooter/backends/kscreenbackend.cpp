@@ -9,6 +9,7 @@
 #include <KScreen/GetConfigOperation>
 #include <KScreen/Mode>
 #include <KScreen/Output>
+#include <KScreen/SetConfigOperation>
 
 using namespace Qt::Literals::StringLiterals;
 
@@ -79,5 +80,43 @@ void KScreenBackend::fetchOutputs(QObject *context, OutputsCallback callback)
             outputs.append(displayOutput(output));
         }
         callback(outputs, {});
+    });
+}
+
+void KScreenBackend::applyOutputSettings(const QString &name, const DisplayOutputSettings &settings, QObject *context, ErrorCallback callback)
+{
+    // Configuration is read again: it can have changed since state was read
+    auto operation = new KScreen::GetConfigOperation(KScreen::ConfigOperation::NoEDID);
+    QObject::connect(operation, &KScreen::ConfigOperation::finished, context, [name, settings, context, callback](KScreen::ConfigOperation *operation) {
+        if (operation->hasError()) {
+            callback(u"Impossible to get display configuration: %1"_s.arg(operation->errorString()));
+            return;
+        }
+        const KScreen::ConfigPtr config = operation->config();
+        const KScreen::OutputList outputs = config->outputs();
+        const auto it = std::ranges::find_if(outputs, [&name](const KScreen::OutputPtr &output) {
+            return output->name() == name;
+        });
+        if (it == outputs.cend() || !(*it)->isConnected()) {
+            callback(u"Unknown or disconnected output: %1"_s.arg(name));
+            return;
+        }
+        const KScreen::OutputPtr output = *it;
+        output->setEnabled(settings.enabled);
+        if (settings.enabled) {
+            if (!settings.modeId.isEmpty()) {
+                output->setCurrentModeId(settings.modeId);
+            }
+            output->setScale(settings.scale);
+            output->setPos(settings.position);
+        }
+        if (!KScreen::Config::canBeApplied(config, KScreen::Config::ValidityFlag::RequireAtLeastOneEnabledScreen)) {
+            callback(u"Display configuration can't be applied"_s);
+            return;
+        }
+        auto setOperation = new KScreen::SetConfigOperation(config);
+        QObject::connect(setOperation, &KScreen::ConfigOperation::finished, context, [callback](KScreen::ConfigOperation *operation) {
+            callback(operation->hasError() ? u"Impossible to apply display configuration: %1"_s.arg(operation->errorString()) : QString());
+        });
     });
 }

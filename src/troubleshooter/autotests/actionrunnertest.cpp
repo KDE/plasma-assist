@@ -83,6 +83,34 @@ Result run(ActionRunner &runner, const QJsonObject &arguments)
     return *result;
 }
 
+// Answer of user to keep question: no value means no answer
+Result runWithRevert(ActionRunner &runner, const QJsonObject &arguments, std::optional<bool> keep, bool canAsk = true)
+{
+    auto result = std::make_shared<Result>();
+    QObject context;
+    const ActionRunner::KeepQuestion ask =
+        [keep, canAsk](const QString &question, std::chrono::milliseconds, QObject *questionContext, const std::function<void(bool keep)> &answer) {
+            Q_ASSERT(question.contains(u"Value: 1 → 5"_s));
+            if (canAsk && keep) {
+                QTimer::singleShot(10ms, questionContext, [answer, keep]() {
+                    answer(*keep);
+                });
+            }
+            return canAsk;
+        };
+    runner.runWithRevert(u"set_value"_s, arguments, &context, ask, [result](const QJsonObject &object, const QString &error) noexcept {
+        result->result = object;
+        result->error = error;
+        result->finished = true;
+    });
+    (void)QTest::qWaitFor(
+        [result]() {
+            return result->finished;
+        },
+        5000);
+    return *result;
+}
+
 Result undo(ActionRunner &runner, const QString &identifier)
 {
     auto result = std::make_shared<Result>();
@@ -206,6 +234,114 @@ void ActionRunnerTest::shouldRecordActionWithoutState()
     QCOMPARE(journal.changes().count(), 1);
     QVERIFY(!journal.changes().first().undoable);
     QVERIFY(undo(runner, journal.changes().first().identifier).error.contains("can't be undone"_L1));
+}
+
+void ActionRunnerTest::shouldKeepChange()
+{
+    const QTemporaryDir directory;
+    ChangeJournal journal(directory.filePath(u"changes.json"_s));
+    ActionRunner runner(&journal);
+    auto system = std::make_shared<FakeSystem>();
+    runner.addAction(u"set_value"_s, valueAction(system));
+
+    const Result result = runWithRevert(runner, {{u"value"_s, 5}}, true);
+    QVERIFY(result.finished);
+    QVERIFY(result.error.isEmpty());
+    QVERIFY(result.result.value("kept"_L1).toBool());
+    QCOMPARE(system->value, 5);
+    QVERIFY(!runner.hasPendingRevert());
+    QVERIFY(!journal.changes().constFirst().undone);
+}
+
+void ActionRunnerTest::shouldRevertChange_data()
+{
+    QTest::addColumn<std::optional<bool>>("keep");
+    QTest::addColumn<bool>("canAsk");
+    QTest::newRow("refused") << std::optional<bool>(false) << true;
+    QTest::newRow("timeout") << std::optional<bool>() << true;
+    QTest::newRow("client can't ask") << std::optional<bool>() << false;
+}
+
+void ActionRunnerTest::shouldRevertChange()
+{
+    QFETCH(std::optional<bool>, keep);
+    QFETCH(bool, canAsk);
+    const QTemporaryDir directory;
+    ChangeJournal journal(directory.filePath(u"changes.json"_s));
+    ActionRunner runner(&journal);
+    runner.setRevertTimeout(200ms);
+    auto system = std::make_shared<FakeSystem>();
+    runner.addAction(u"set_value"_s, valueAction(system));
+
+    const Result result = runWithRevert(runner, {{u"value"_s, 5}}, keep, canAsk);
+    QVERIFY(result.finished);
+    QVERIFY(result.error.isEmpty());
+    QVERIFY(result.result.value("reverted"_L1).toBool());
+    QVERIFY(!result.result.value("changed"_L1).toBool());
+    QCOMPARE(system->value, 1);
+    QVERIFY(journal.changes().constFirst().undone);
+}
+
+void ActionRunnerTest::shouldRevertWhenRequestIsCancelled()
+{
+    const QTemporaryDir directory;
+    ChangeJournal journal(directory.filePath(u"changes.json"_s));
+    ActionRunner runner(&journal);
+    auto system = std::make_shared<FakeSystem>();
+    runner.addAction(u"set_value"_s, valueAction(system));
+
+    bool called = false;
+    auto context = new QObject;
+    runner.runWithRevert(
+        u"set_value"_s,
+        {{u"value"_s, 5}},
+        context,
+        [](const QString &, std::chrono::milliseconds, QObject *, const std::function<void(bool)> &) noexcept {
+            return true;
+        },
+        [&called](const QJsonObject &, const QString &) noexcept {
+            called = true;
+        });
+    QVERIFY(QTest::qWaitFor([&system]() {
+        return system->value == 5;
+    }));
+    delete context;
+    QVERIFY(QTest::qWaitFor([&runner]() {
+        return !runner.hasPendingRevert();
+    }));
+    QCOMPARE(system->value, 1);
+    QVERIFY(!called);
+}
+
+void ActionRunnerTest::shouldRevertPendingChanges()
+{
+    const QTemporaryDir directory;
+    ChangeJournal journal(directory.filePath(u"changes.json"_s));
+    ActionRunner runner(&journal);
+    auto system = std::make_shared<FakeSystem>();
+    runner.addAction(u"set_value"_s, valueAction(system));
+
+    QObject context;
+    runner.runWithRevert(
+        u"set_value"_s,
+        {{u"value"_s, 5}},
+        &context,
+        [](const QString &, std::chrono::milliseconds, QObject *, const std::function<void(bool)> &) noexcept {
+            return true;
+        },
+        [](const QJsonObject &, const QString &) noexcept { });
+    QVERIFY(QTest::qWaitFor([&system]() {
+        return system->value == 5;
+    }));
+    QVERIFY(runner.hasPendingRevert());
+    bool reverted = false;
+    runner.revertPendingChanges([&reverted]() noexcept {
+        reverted = true;
+    });
+    QVERIFY(QTest::qWaitFor([&reverted]() {
+        return reverted;
+    }));
+    QCOMPARE(system->value, 1);
 }
 
 #include "moc_actionrunnertest.cpp"

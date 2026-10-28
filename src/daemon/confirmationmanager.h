@@ -18,6 +18,7 @@ class QTimer;
 // Asks user (with D-Bus client) to confirm tools which change system.
 // Rules: actions are disabled by default, no answer or no client means Deny, only client which sent message can answer,
 // "always allow" is never used for destructive tools, summary is built from arguments (not by language model).
+// It also asks user to keep a change (display settings) which is reverted by server without answer.
 class ConfirmationManager : public QObject
 {
     Q_OBJECT
@@ -30,6 +31,8 @@ public:
     enum class Risk : uint8_t {
         Modify,
         Destructive,
+        // Change was applied, server reverts it unless user keeps it: title is question of server
+        Keep,
     };
     struct Request {
         QString tool;
@@ -39,6 +42,8 @@ public:
         QByteArray conversation;
         // D-Bus unique name of client which sent message (empty: called in process)
         QString client;
+        // Zero: default timeout
+        std::chrono::milliseconds timeout{0};
     };
     using AnswerCallback = std::function<void(bool allowed)>;
 

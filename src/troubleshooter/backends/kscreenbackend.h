@@ -15,4 +15,5 @@ public:
     ~KScreenBackend() override;
 
     void fetchOutputs(QObject *context, OutputsCallback callback) override;
+    void applyOutputSettings(const QString &name, const DisplayOutputSettings &settings, QObject *context, ErrorCallback callback) override;
 };

@@ -110,7 +110,9 @@
       <arg name="isError" type="b" direction="out"/>
     </signal>
     <!-- Assistant needs a confirmation before changing system. risk: modify or destructive.
-         Request is denied after 120 seconds -->
+         Request is denied after 120 seconds.
+         risk keep: change was applied (display settings), summary asks to keep it, argumentsJson contains timeoutSeconds:
+         change is reverted when it's not kept (Confirm 1) before this timeout -->
     <signal name="ConfirmationRequested">
       <arg name="requestId" type="s" direction="out"/>
       <arg name="conversation" type="s" direction="out"/>

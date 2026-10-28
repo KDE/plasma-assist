@@ -6,6 +6,7 @@
 #pragma once
 
 #include <TextAutoGenerateTextMcpProtocolCore/McpProtocolServerProtocolManager>
+#include <functional>
 #include <memory>
 
 class ActionRunner;
@@ -23,6 +24,9 @@ class TroubleshooterServer : public TextAutoGenerateTextMcpProtocolCore::McpProt
 public:
     explicit TroubleshooterServer(QObject *parent = nullptr);
     ~TroubleshooterServer() override;
+
+    // Changes not kept yet by user (display settings) are reverted before quitting
+    void revertPendingChanges(const std::function<void()> &callback);
 
 private:
     // Used by tools. Deleted before base class (tools): no tool is called during destruction

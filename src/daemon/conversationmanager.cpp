@@ -22,6 +22,9 @@
 #include <TextAutoGenerateText/TextAutoGenerateMessagesModel>
 #include <TextAutoGenerateText/TextAutoGenerateTextInstancesManagerDialog>
 #include <TextAutoGenerateText/TextAutoGenerateTextPlugin>
+#include <TextAutoGenerateTextMcpProtocolCore/McpProtocolElicitRequestFormParams>
+#include <TextAutoGenerateTextMcpProtocolCore/McpProtocolElicitRequestURLParams>
+#include <TextAutoGenerateTextMcpProtocolCore/McpProtocolElicitResult>
 #include <TextAutoGenerateTextMcpProtocolCore/McpServerManager>
 #include <TextAutoGenerateTextMcpProtocolCore/McpServerModel>
 
@@ -32,6 +35,17 @@ using namespace TextAutoGenerateText;
 namespace
 {
 constexpr int maximumTitleLength = 80;
+// Server reverts a change after its own timeout: keep question can't wait longer
+constexpr qint64 defaultKeepSeconds = 15;
+constexpr qint64 maximumKeepSeconds = 120;
+
+TextAutoGenerateTextMcpProtocolCore::McpProtocolElicitResult elicitResult(bool accepted)
+{
+    TextAutoGenerateTextMcpProtocolCore::McpProtocolElicitResult result;
+    result.setAction(accepted ? TextAutoGenerateTextMcpProtocolCore::McpProtocolElicitResult::Action::Accept
+                              : TextAutoGenerateTextMcpProtocolCore::McpProtocolElicitResult::Action::Decline);
+    return result;
+}
 
 QString systemPrompt()
 {
@@ -151,6 +165,37 @@ void ConversationManager::ensureManager()
             // "Always allow" of ktextaddons would allow destructive tools too: it's managed by confirmation manager
             mConfirmationManager->request(request, [answer](bool allowed) {
                 answer(allowed ? TextAutoGenerateMcpToolsManager::ToolConfirmation::Allow : TextAutoGenerateMcpToolsManager::ToolConfirmation::Deny);
+            });
+        });
+
+    // Troubleshooter asks to keep a change (display settings) with a question without field
+    mManager->textAutoGenerateMcpToolsManager()->setElicitationHandler(
+        [this](const TextAutoGenerateMcpToolsManager::ElicitationInfo &info,
+               const std::function<void(const TextAutoGenerateTextMcpProtocolCore::McpProtocolElicitResult &)> &answer) {
+            const TextAutoGenerateTextMcpProtocolCore::McpProtocolUtils::ElicitRequestParams params = info.request.params();
+            const auto *form = std::get_if<TextAutoGenerateTextMcpProtocolCore::McpProtocolElicitRequestFormParams>(&params);
+            if (!mConfirmationManager || info.serverName != TroubleshooterClient::server().name() || !form || !form->requestedSchema().properties().isEmpty()) {
+                qCWarning(PLASMA_ASSIST_DAEMON_LOG) << "Unsupported elicitation from" << info.serverName;
+                answer(elicitResult(false));
+                return;
+            }
+            qint64 seconds = defaultKeepSeconds;
+            if (const auto meta = form->meta(); meta) {
+                seconds = meta->additionalProperties().value("org.kde/timeoutSeconds"_L1).toInteger(defaultKeepSeconds);
+            }
+            seconds = std::clamp<qint64>(seconds, 1, maximumKeepSeconds);
+            const QByteArray conversation = mConversationsInProgress.isEmpty() ? QByteArray() : *mConversationsInProgress.cbegin();
+            const ConfirmationManager::Request request{
+                .tool = {},
+                .title = form->message(),
+                .arguments = {{u"timeoutSeconds"_s, seconds}},
+                .risk = ConfirmationManager::Risk::Keep,
+                .conversation = conversation,
+                .client = mConversationClients.value(conversation),
+                .timeout = std::chrono::seconds(seconds),
+            };
+            mConfirmationManager->request(request, [answer](bool keep) {
+                answer(elicitResult(keep));
             });
         });
 

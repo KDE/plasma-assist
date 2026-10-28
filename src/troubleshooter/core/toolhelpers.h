@@ -76,6 +76,7 @@ void callTool(TextAutoGenerateTextMcpProtocolCore::McpProtocolServerProtocolMana
 // Language models often send numbers and booleans as strings ("60", "true"): they are accepted.
 // Daemon uses same rules to show arguments to user.
 [[nodiscard]] std::optional<qint64> integerArgument(const QJsonValue &value);
+[[nodiscard]] std::optional<double> numberArgument(const QJsonValue &value);
 [[nodiscard]] std::optional<bool> booleanArgument(const QJsonValue &value);
 
 // Answers with error \a message (personal data are masked)

@@ -8,10 +8,10 @@
 #include "changejournal.h"
 #include <QHash>
 #include <QJsonObject>
+#include <QObject>
 #include <chrono>
 #include <functional>
 
-class QObject;
 namespace TextAutoGenerateTextMcpProtocolCore
 {
 class McpProtocolServerProtocolManager;
@@ -38,6 +38,10 @@ class ActionRunner
 {
 public:
     using ResultCallback = std::function<void(const QJsonObject &result, const QString &error)>;
+    // Asks user whether change must be kept, \a answer is not called when \a context is deleted.
+    // Returns false when user can't be asked
+    using KeepQuestion =
+        std::function<bool(const QString &question, std::chrono::milliseconds timeout, QObject *context, const std::function<void(bool keep)> &answer)>;
 
     explicit ActionRunner(ChangeJournal *journal);
     ~ActionRunner();
@@ -51,6 +55,10 @@ public:
     void addActionTool(TextAutoGenerateTextMcpProtocolCore::McpProtocolServerProtocolManager *manager,
                        const TextAutoGenerateTextMcpProtocolCore::McpProtocolTool &definition,
                        const Action &action);
+    // Like addActionTool(), but change is reverted unless user keeps it (elicitation): display settings can make screen unusable
+    void addRevertibleActionTool(TextAutoGenerateTextMcpProtocolCore::McpProtocolServerProtocolManager *manager,
+                                 const TextAutoGenerateTextMcpProtocolCore::McpProtocolTool &definition,
+                                 const Action &action);
     // Records an action which has no state (restart, reconnection): it can't be undone
     void record(const QString &tool, const QString &summary, const QJsonObject &arguments);
 
@@ -59,6 +67,15 @@ public:
     // Result: changed, changeId, summary, before, after
     void run(const QString &tool, const QJsonObject &arguments, QObject *context, const ResultCallback &callback);
     void undo(const QString &changeIdentifier, QObject *context, const ResultCallback &callback);
+    // Like run(), then asks user to keep change: it's reverted after revert timeout, when user refuses or can't be asked,
+    // or when \a context is deleted (request cancelled). Result contains "kept" or "reverted"
+    void runWithRevert(const QString &tool, const QJsonObject &arguments, QObject *context, const KeepQuestion &ask, const ResultCallback &callback);
+
+    // Time given to user to keep a change (15 seconds)
+    void setRevertTimeout(std::chrono::milliseconds timeout);
+    [[nodiscard]] bool hasPendingRevert() const;
+    // Reverts changes which are not kept yet (server stops): \a callback is called when it's done
+    void revertPendingChanges(const std::function<void()> &callback);
 
     [[nodiscard]] ChangeJournal *journal() const;
 
@@ -69,4 +86,7 @@ private:
     ChangeJournal *const mJournal;
     QHash<QString, Action> mActions;
     std::chrono::milliseconds mApplyTimeout;
+    std::chrono::milliseconds mRevertTimeout;
+    // Parent of changes which wait for user: they are deleted with runner
+    QObject mPendingReverts;
 };

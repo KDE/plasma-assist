@@ -125,7 +125,8 @@ Use <guibutton>Configure Language Model…</guibutton> on the home page to choos
 <title>Actions and Confirmations</title>
 <para>
 The assistant can change some settings: default audio device, volume, audio card profile, output of
-an application, Wi-Fi, network connection, power profile, or restart the &plasma; shell.
+an application, display settings (enable or disable a screen, its resolution, refresh rate, scale
+or position), Wi-Fi, network connection, power profile, or restart the &plasma; shell.
 Actions are disabled by default: enable <guilabel>Allow assistant to change settings</guilabel>
 on the home page.
 </para>
@@ -136,6 +137,12 @@ built from its real arguments, not written by the language model. Choose <guibut
 change (this choice is not proposed for actions which can't be undone, like restarting the &plasma; shell).
 Without an answer after two minutes, the action is denied. When the applet is closed, a notification
 lets you open it or deny the action.
+</para>
+<para>
+A wrong display setting can leave a screen black or unusable: after a change of display settings,
+choose <guibutton>Keep</guibutton> within 15 seconds, otherwise the previous settings are restored.
+<guibutton>Revert</guibutton> restores them at once. The assistant refuses to disable the only enabled
+screen.
 </para>
 
 <sect1 id="changes">

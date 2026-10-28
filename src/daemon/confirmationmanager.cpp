@@ -53,6 +53,47 @@ std::optional<bool> booleanValue(const QJsonValue &value)
     return std::nullopt;
 }
 
+QString numberText(const QJsonValue &value)
+{
+    if (value.isDouble()) {
+        return QString::number(value.toDouble());
+    }
+    return value.toString().trimmed();
+}
+
+bool hasValue(const QJsonObject &arguments, QLatin1StringView name)
+{
+    const QJsonValue value = arguments.value(name);
+    return !value.isUndefined() && !value.isNull();
+}
+
+QString displayChanges(const QJsonObject &arguments)
+{
+    QStringList changes;
+    if (hasValue(arguments, "enabled"_L1)) {
+        const std::optional<bool> enabled = booleanValue(arguments.value("enabled"_L1));
+        changes.append(!enabled ? arguments.value("enabled"_L1).toString()
+                                : (*enabled ? i18nc("@info display change", "enable") : i18nc("@info display change", "disable")));
+    }
+    if (hasValue(arguments, "resolution"_L1)) {
+        changes.append(i18nc("@info display change", "resolution %1", arguments.value("resolution"_L1).toString()));
+    }
+    if (hasValue(arguments, "refresh_rate"_L1)) {
+        changes.append(i18nc("@info display change", "refresh rate %1 Hz", numberText(arguments.value("refresh_rate"_L1))));
+    }
+    if (hasValue(arguments, "scale"_L1)) {
+        changes.append(i18nc("@info display change", "scale %1", numberText(arguments.value("scale"_L1))));
+    }
+    if (hasValue(arguments, "x"_L1) || hasValue(arguments, "y"_L1)) {
+        const QString unchanged = i18nc("@info display position not changed", "unchanged");
+        changes.append(i18nc("@info display change",
+                             "position %1,%2",
+                             hasValue(arguments, "x"_L1) ? integerText(arguments.value("x"_L1)) : unchanged,
+                             hasValue(arguments, "y"_L1) ? integerText(arguments.value("y"_L1)) : unchanged));
+    }
+    return changes.join(i18nc("@info separator of display changes", ", "));
+}
+
 QString deviceOrDefault(const QJsonObject &arguments)
 {
     const QString device = arguments.value("device"_L1).toString();
@@ -133,7 +174,15 @@ bool ConfirmationManager::hasPendingRequest() const
 
 QString ConfirmationManager::riskName(Risk risk)
 {
-    return risk == Risk::Modify ? u"modify"_s : u"destructive"_s;
+    switch (risk) {
+    case Risk::Modify:
+        return u"modify"_s;
+    case Risk::Destructive:
+        break;
+    case Risk::Keep:
+        return u"keep"_s;
+    }
+    return u"destructive"_s;
 }
 
 QString ConfirmationManager::summary(const QString &tool, const QString &title, const QJsonObject &arguments)
@@ -172,6 +221,12 @@ QString ConfirmationManager::summary(const QString &tool, const QString &title, 
     if (tool == "restart_plasmashell"_L1) {
         return i18nc("@info confirmation", "Restart Plasma shell: panels and desktop are reloaded");
     }
+    if (tool == "set_output_config"_L1) {
+        return i18nc("@info confirmation, %1 display, %2 changes",
+                     "Change display %1: %2. You will be asked to keep the new settings, otherwise they are reverted.",
+                     arguments.value("output"_L1).toString(),
+                     displayChanges(arguments));
+    }
     if (tool == "undo_change"_L1) {
         return i18nc("@info confirmation", "Undo change %1", arguments.value("id"_L1).toString());
     }
@@ -181,14 +236,17 @@ QString ConfirmationManager::summary(const QString &tool, const QString &title, 
 
 void ConfirmationManager::request(const Request &request, const AnswerCallback &callback)
 {
-    if (!mActionsAllowed) {
-        Q_EMIT actionRefused(request.conversation, request.title);
-        callback(false);
-        return;
-    }
-    if (request.risk == Risk::Modify && isAlwaysAllowed(request.tool)) {
-        callback(true);
-        return;
+    // Change to keep was already allowed
+    if (request.risk != Risk::Keep) {
+        if (!mActionsAllowed) {
+            Q_EMIT actionRefused(request.conversation, request.title);
+            callback(false);
+            return;
+        }
+        if (request.risk == Risk::Modify && isAlwaysAllowed(request.tool)) {
+            callback(true);
+            return;
+        }
     }
     if (!request.client.isEmpty()) {
         if (!QDBusConnection::sessionBus().interface()->isServiceRegistered(request.client)) {
@@ -206,11 +264,11 @@ void ConfirmationManager::request(const Request &request, const AnswerCallback &
         finish(identifier, false);
     });
     mPendingRequests.insert(identifier, PendingRequest{.request = request, .callback = callback, .timer = timer});
-    timer->start(mTimeout);
+    timer->start(request.timeout > 0ms ? request.timeout : mTimeout);
     Q_EMIT confirmationRequested(identifier,
                                  request.conversation,
                                  request.tool,
-                                 summary(request.tool, request.title, request.arguments),
+                                 request.risk == Risk::Keep ? request.title : summary(request.tool, request.title, request.arguments),
                                  QString::fromUtf8(QJsonDocument(request.arguments).toJson(QJsonDocument::Compact)),
                                  riskName(request.risk));
 }

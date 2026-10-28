@@ -55,6 +55,8 @@ target_sources(
         modules/reportmodule.cpp
         modules/audioactions.h
         modules/audioactions.cpp
+        modules/displayactions.h
+        modules/displayactions.cpp
         modules/systemactions.h
         modules/systemactions.cpp
         modules/bugreportmodule.h

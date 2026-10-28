@@ -36,10 +36,12 @@ int main(int argc, char *argv[])
     aboutData.processCommandLine(&parser);
 
     TroubleshooterServer server;
-    QObject::connect(&server, &TroubleshooterServer::runningChanged, &app, [](bool running) {
+    QObject::connect(&server, &TroubleshooterServer::runningChanged, &app, [&server](bool running) {
         // Client closed stdin
         if (!running) {
-            QCoreApplication::quit();
+            server.revertPendingChanges([]() {
+                QCoreApplication::quit();
+            });
         }
     });
     server.start();

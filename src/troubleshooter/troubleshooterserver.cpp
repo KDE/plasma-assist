@@ -18,6 +18,7 @@
 #include "modules/audiomodule.h"
 #include "modules/bugreportmodule.h"
 #include "modules/crashmodule.h"
+#include "modules/displayactions.h"
 #include "modules/displaymodule.h"
 #include "modules/logmodule.h"
 #include "modules/networkmodule.h"
@@ -72,10 +73,16 @@ TroubleshooterServer::TroubleshooterServer(QObject *parent)
 
     // Actions: client asks user to confirm them (annotations)
     AudioActions::registerTools(this, mAudioBackend.get(), mActionRunner.get());
+    DisplayActions::registerTools(this, mDisplayBackend.get(), mActionRunner.get());
     SystemActions::registerTools(this, mNetworkBackend.get(), mPowerBackend.get(), mCommandRunner.get(), mActionRunner.get());
     mActionRunner->registerTools(this);
 }
 
 TroubleshooterServer::~TroubleshooterServer() = default;
+
+void TroubleshooterServer::revertPendingChanges(const std::function<void()> &callback)
+{
+    mActionRunner->revertPendingChanges(callback);
+}
 
 #include "moc_troubleshooterserver.cpp"

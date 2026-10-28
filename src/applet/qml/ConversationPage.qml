@@ -174,6 +174,7 @@ ColumnLayout {
                         summary: delegateItem.text
                         status: delegateItem.status
                         risk: delegateItem.risk
+                        arguments: delegateItem.arguments
                     }
                 }
 
